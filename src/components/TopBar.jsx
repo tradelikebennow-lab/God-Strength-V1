@@ -19,6 +19,7 @@ export default function TopBar({
   availableYears,
   onImportClick,
   onExportClick,
+  onSignOut,
 }) {
   return (
     <header className="topbar">
@@ -55,6 +56,11 @@ export default function TopBar({
           <button className="btn btn-ghost btn-icon" onClick={onExportClick} title="Export JSON backup">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M8 11V2m0 0l-3 3m3-3l3 3M3 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(180 8 8)" />
+            </svg>
+          </button>
+          <button className="btn btn-ghost btn-icon" onClick={onSignOut} title="Sign out">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
