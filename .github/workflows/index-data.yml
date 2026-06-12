@@ -1,5 +1,9 @@
-# Refreshes daily benchmark closes (SPX, NDX, Gold, BTC) into the Supabase index_closes
-# table. Runs weekly after Friday's US close + on demand via the Actions tab.
+# Refreshes daily benchmark closes (SPX, NDX, Gold, BTC) into the Supabase
+# index_closes table. Runs weekly after Friday's US close + on demand via
+# the Actions tab.
+#
+# Data source: Yahoo Finance v8 chart API (Stooq blocks GitHub runner IPs).
+# Gold uses COMEX futures (GC=F) — Yahoo has no spot XAUUSD series.
 #
 # Required repo secret (Settings → Secrets and variables → Actions):
 #   SUPABASE_SERVICE_ROLE_KEY — the service_role key from Supabase
@@ -15,39 +19,48 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch Stooq closes and upsert to Supabase
+      - name: Fetch Yahoo Finance closes and upsert to Supabase
         env:
           SUPABASE_URL: https://cqpjcpeftfrdwszsvhgj.supabase.co
           SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python3 << 'PY'
-          import csv, io, json, os, urllib.request, urllib.parse
+          import json, os, urllib.request, urllib.parse
+          from datetime import datetime, timezone
 
-          SYMBOLS = {'SPX': '^spx', 'NDX': '^ndx', 'XAUUSD': 'xauusd', 'BTCUSD': 'btcusd'}
+          SYMBOLS = {'SPX': '^GSPC', 'NDX': '^NDX', 'XAUUSD': 'GC=F', 'BTCUSD': 'BTC-USD'}
           SINCE = '2025-01-01'
+          UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
           url_base = os.environ['SUPABASE_URL']
           key = os.environ['SERVICE_ROLE_KEY']
-          UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
-          rows = []
-          for name, stooq in SYMBOLS.items():
-              # encode the symbol (^ must become %5E) and send a browser UA —
-              # Stooq returns 404 for unencoded carets / default Python agents
-              sym = urllib.parse.quote(stooq, safe='')
-              req_s = urllib.request.Request(f'https://stooq.com/q/d/l/?s={sym}&i=d', headers=UA)
-              with urllib.request.urlopen(req_s) as r:
-                  text = r.read().decode()
+          dedup = {}  # (symbol, date) -> row; avoids duplicate-key upsert errors
+          for name, ysym in SYMBOLS.items():
+              sym = urllib.parse.quote(ysym, safe='')
+              url = f'https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=2y'
+              with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30) as r:
+                  data = json.load(r)
+              result = (data.get('chart', {}).get('result') or [None])[0]
+              if not result:
+                  print(f'WARNING: {name} ({ysym}) returned no result from Yahoo')
+                  continue
+              ts = result.get('timestamp', [])
+              closes = result['indicators']['quote'][0].get('close', [])
               count = 0
-              for rec in csv.DictReader(io.StringIO(text)):
-                  if rec.get('Date', '') >= SINCE and rec.get('Close'):
-                      rows.append({'symbol': name, 'date': rec['Date'], 'close': float(rec['Close'])})
+              for t, c in zip(ts, closes):
+                  if c is None:
+                      continue
+                  d = datetime.fromtimestamp(t, tz=timezone.utc).strftime('%Y-%m-%d')
+                  if d >= SINCE:
+                      dedup[(name, d)] = {'symbol': name, 'date': d, 'close': round(float(c), 4)}
                       count += 1
               print(f'{name}: {count} rows')
               if count == 0:
-                  print(f'WARNING: {name} returned no usable rows — check the Stooq ticker')
+                  print(f'WARNING: {name} returned no usable rows — check the Yahoo ticker')
 
+          rows = list(dedup.values())
           print(f'parsed {len(rows)} rows total')
-          assert rows, 'no rows parsed — Stooq format change?'
+          assert rows, 'no rows parsed — Yahoo format change?'
 
           req = urllib.request.Request(
               f'{url_base}/rest/v1/index_closes?on_conflict=symbol,date',
