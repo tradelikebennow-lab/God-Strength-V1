@@ -21,16 +21,21 @@ jobs:
           SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python3 << 'PY'
-          import csv, io, json, os, urllib.request
+          import csv, io, json, os, urllib.request, urllib.parse
 
           SYMBOLS = {'SPX': '^spx', 'NDX': '^ndx', 'XAUUSD': 'xauusd', 'BTCUSD': 'btcusd'}
           SINCE = '2025-01-01'
           url_base = os.environ['SUPABASE_URL']
           key = os.environ['SERVICE_ROLE_KEY']
+          UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
           rows = []
           for name, stooq in SYMBOLS.items():
-              with urllib.request.urlopen(f'https://stooq.com/q/d/l/?s={stooq}&i=d') as r:
+              # encode the symbol (^ must become %5E) and send a browser UA —
+              # Stooq returns 404 for unencoded carets / default Python agents
+              sym = urllib.parse.quote(stooq, safe='')
+              req_s = urllib.request.Request(f'https://stooq.com/q/d/l/?s={sym}&i=d', headers=UA)
+              with urllib.request.urlopen(req_s) as r:
                   text = r.read().decode()
               count = 0
               for rec in csv.DictReader(io.StringIO(text)):
