@@ -1,0 +1,60 @@
+# Refreshes daily benchmark closes (SPX, NDX, Gold, BTC) into the Supabase index_closes
+# table. Runs weekly after Friday's US close + on demand via the Actions tab.
+#
+# Required repo secret (Settings → Secrets and variables → Actions):
+#   SUPABASE_SERVICE_ROLE_KEY — the service_role key from Supabase
+#   (Project Settings → API Keys → Legacy tab, or a new secret key).
+name: Refresh index data
+
+on:
+  schedule:
+    - cron: '0 22 * * 5' # Friday 22:00 UTC
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Stooq closes and upsert to Supabase
+        env:
+          SUPABASE_URL: https://cqpjcpeftfrdwszsvhgj.supabase.co
+          SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python3 << 'PY'
+          import csv, io, json, os, urllib.request
+
+          SYMBOLS = {'SPX': '^spx', 'NDX': '^ndx', 'XAUUSD': 'xauusd', 'BTCUSD': 'btcusd'}
+          SINCE = '2025-01-01'
+          url_base = os.environ['SUPABASE_URL']
+          key = os.environ['SERVICE_ROLE_KEY']
+
+          rows = []
+          for name, stooq in SYMBOLS.items():
+              with urllib.request.urlopen(f'https://stooq.com/q/d/l/?s={stooq}&i=d') as r:
+                  text = r.read().decode()
+              count = 0
+              for rec in csv.DictReader(io.StringIO(text)):
+                  if rec.get('Date', '') >= SINCE and rec.get('Close'):
+                      rows.append({'symbol': name, 'date': rec['Date'], 'close': float(rec['Close'])})
+                      count += 1
+              print(f'{name}: {count} rows')
+              if count == 0:
+                  print(f'WARNING: {name} returned no usable rows — check the Stooq ticker')
+
+          print(f'parsed {len(rows)} rows total')
+          assert rows, 'no rows parsed — Stooq format change?'
+
+          req = urllib.request.Request(
+              f'{url_base}/rest/v1/index_closes?on_conflict=symbol,date',
+              data=json.dumps(rows).encode(),
+              headers={
+                  'apikey': key,
+                  'Authorization': f'Bearer {key}',
+                  'Content-Type': 'application/json',
+                  'Prefer': 'resolution=merge-duplicates',
+              },
+              method='POST',
+          )
+          with urllib.request.urlopen(req) as resp:
+              print('upsert status', resp.status)
+          PY
