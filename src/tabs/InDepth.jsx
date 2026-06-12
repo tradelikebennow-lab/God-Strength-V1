@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ScatterChart, Scatter, CartesianGrid, ZAxis } from 'recharts';
 import StatCard from '../components/StatCard.jsx';
 import MiniTable from '../components/MiniTable.jsx';
-import { computeAccountStats } from '../analytics/account.js';
+import { computeAccountStats, matchesStrategy } from '../analytics/account.js';
 import { byStrategy, byDirection, byTradeType, byLOIFreshness, byMarket, byInstrument, allAccountsComparison } from '../analytics/breakdowns.js';
 import { marketZoneSizes, concurrentTrades, rDistribution, dayOfWeekStats, holdTimeVsR } from '../analytics/extras.js';
 import { fmtCur, fmtPct, fmtR, tradesToUSD } from '../utils/currency.js';
@@ -42,14 +42,23 @@ export default function InDepth({ state, filters }) {
     const instBd = byInstrument(usdTrades, filters2);
     const compareRows = allAccountsComparison(accounts, usdTrades, transactions, { year, strategy, month: monthFilterApplied });
 
-    const zones = marketZoneSizes(trades, { year });
-    const concurrent = accountId
-      ? concurrentTrades(trades.filter((t) => t.accountId === accountId), { year })
-      : concurrentTrades(trades, { year });
+    // Apply strategy + month to the extras sections too, so every panel
+    // on this page answers the same filtered question (previously these
+    // ignored the strategy filter and the month chips).
+    const extrasTrades = trades.filter((t) => {
+      if (strategy && !matchesStrategy(t.timeframe, strategy)) return false;
+      if (monthFilterApplied && parseInt(String(t.closeDate || t.filledDate).slice(5, 7), 10) !== monthFilterApplied) return false;
+      return true;
+    });
 
-    const rDist = rDistribution(trades, { year, accountId });
-    const dow = dayOfWeekStats(trades, { year, accountId });
-    const holdScatter = holdTimeVsR(trades, { year, accountId });
+    const zones = marketZoneSizes(extrasTrades, { year });
+    const concurrent = accountId
+      ? concurrentTrades(extrasTrades.filter((t) => t.accountId === accountId), { year })
+      : concurrentTrades(extrasTrades, { year });
+
+    const rDist = rDistribution(extrasTrades, { year, accountId });
+    const dow = dayOfWeekStats(extrasTrades, { year, accountId });
+    const holdScatter = holdTimeVsR(extrasTrades, { year, accountId });
 
     return { accStats, strategyBd, directionBd, typeBd, loiBd, marketBd, instBd, compareRows, zones, concurrent, rDist, dow, holdScatter };
   }, [accounts, trades, transactions, year, accountId, strategy, monthFilterApplied]);

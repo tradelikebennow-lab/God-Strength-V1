@@ -121,7 +121,8 @@ export default function App() {
   const availableYears = useMemo(() => {
     const years = new Set();
     for (const t of state?.trades || []) {
-      if (t.filledDate) years.add(dateYear(t.filledDate));
+      const d = t.closeDate || t.filledDate;
+      if (d) years.add(dateYear(d));
     }
     return [...years].sort((a, b) => b - a);
   }, [state?.trades]);

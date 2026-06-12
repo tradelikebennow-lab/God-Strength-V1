@@ -29,6 +29,7 @@ const ACCOUNT_MAP = {
   status: 'status',
   payoutSplit: 'payout_split',
   fxRate: 'fx_rate',
+  dailyLossLimit: 'daily_loss_limit',
 };
 
 const TRADE_MAP = {
@@ -84,7 +85,7 @@ const DATE_FIELDS = new Set(['filledDate', 'tp1Date', 'closeDate', 'date']);
 // be coerced back to JS numbers on load.
 const NUMERIC_FIELDS = new Set([
   // accounts
-  'initialBalance', 'riskPct', 'tierStart', 'breachFloor', 'payoutSplit', 'fxRate',
+  'initialBalance', 'riskPct', 'tierStart', 'breachFloor', 'payoutSplit', 'fxRate', 'dailyLossLimit',
   // trades
   'tp1R', 'tp2R', 'totalR', 'tp1Pnl', 'tp2Pnl', 'totalPnl',
   'entry', 'stop', 'tp1', 'exitPrice', 'streak', 'isWinner', 'nonBreakeven',

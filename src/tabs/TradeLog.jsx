@@ -19,7 +19,7 @@ export default function TradeLog({ state, setState, filters }) {
     const q = search.trim().toLowerCase();
     return trades
       .filter((t) => {
-        if (filters.year && dateYear(t.filledDate) !== filters.year) return false;
+        if (filters.year && dateYear(t.closeDate || t.filledDate) !== filters.year) return false;
         if (filters.accountId && t.accountId !== filters.accountId) return false;
         if (filters.strategy && !matchesStrategy(t.timeframe, filters.strategy)) return false;
         if (q) {
