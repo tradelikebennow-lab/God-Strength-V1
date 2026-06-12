@@ -21,6 +21,7 @@ export default function Dashboard({ state, filters }) {
 
   /* ----- Benchmark selection + daily closes (loaded once) ----- */
   const [benchSymbol, setBenchSymbol] = React.useState('SPX');
+  const [monthlyMode, setMonthlyMode] = React.useState('TWR'); // 'TWR' | 'USD' | 'R'
   const [indexCloses, setIndexCloses] = React.useState(null); // null = loading, {} = none
   React.useEffect(() => {
     let active = true;
@@ -148,10 +149,46 @@ export default function Dashboard({ state, filters }) {
       return { month: k, ret };
     });
 
-    return { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData, riskRows, monthlyReturns };
+    // USD + R per close-month from the same filtered, USD-normalized trades
+    // as the stats panel (TWR ignores capital; these show dollars and pure R).
+    const aggByMonth = new Map();
+    for (const t of filteredTrades) {
+      const k = String(t.closeDate || t.filledDate || '').slice(0, 7);
+      if (!k) continue;
+      const cur = aggByMonth.get(k) || { pnl: 0, r: 0 };
+      cur.pnl += t.totalPnl || 0;
+      cur.r += t.totalR || 0;
+      aggByMonth.set(k, cur);
+    }
+    const monthlyPnlR = [...aggByMonth.keys()].sort().map((k) => ({
+      month: k,
+      pnl: aggByMonth.get(k).pnl,
+      r: aggByMonth.get(k).r,
+    }));
+
+    return { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData, riskRows, monthlyReturns, monthlyPnlR };
   }, [accounts, trades, transactions, year, accountId, strategy, indexCloses, benchSymbol]);
 
-  const { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData, riskRows, monthlyReturns } = M;
+  const { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData, riskRows, monthlyReturns, monthlyPnlR } = M;
+
+  /* ----- Monthly chart: active series + formatter per mode ----- */
+  const monthlyChart =
+    monthlyMode === 'TWR'
+      ? monthlyReturns.map((m) => ({ month: m.month, val: m.ret }))
+      : monthlyPnlR.map((m) => ({ month: m.month, val: monthlyMode === 'USD' ? m.pnl : m.r }));
+  const monthlyFmt = (v) =>
+    monthlyMode === 'TWR'
+      ? v.toFixed(2) + '%'
+      : monthlyMode === 'USD'
+        ? fmtCur(v, 'USD', currencyMode, fxRate, { compact: true })
+        : fmtR(v, 2, true);
+  const monthlyAxisFmt = (v) =>
+    monthlyMode === 'TWR'
+      ? v.toFixed(1) + '%'
+      : monthlyMode === 'USD'
+        ? (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(Math.round(v)))
+        : v.toFixed(1);
+  const monthlyLabel = monthlyMode === 'TWR' ? 'Monthly TWR' : monthlyMode === 'USD' ? 'Net P&L' : 'Total R';
   const eurFx = fxRate;
 
   /* ----- Currency formatters bound to current mode ----- */
@@ -405,11 +442,24 @@ export default function Dashboard({ state, filters }) {
       </div>
 
       {/* ---- MONTHLY RETURNS BAR CHART ---- */}
-      {monthlyReturns.length > 0 && (
+      {(monthlyReturns.length > 0 || monthlyPnlR.length > 0) && (
         <div className="panel">
-          <div className="dash-section-title">Monthly Returns (TWR) · {year || 'All Years'}</div>
+          <div className="flex" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="dash-section-title">Monthly Returns · {year || 'All Years'}</div>
+            <div className="filter-chips" style={{ marginBottom: 'var(--space-md)' }}>
+              {['TWR', 'USD', 'R'].map((m) => (
+                <button
+                  key={m}
+                  className={`filter-chip ${monthlyMode === m ? 'active' : ''}`}
+                  onClick={() => setMonthlyMode(m)}
+                >
+                  {m === 'TWR' ? 'TWR %' : m}
+                </button>
+              ))}
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyReturns} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={monthlyChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="var(--border)" vertical={false} />
               <XAxis
                 dataKey="month"
@@ -422,20 +472,20 @@ export default function Dashboard({ state, filters }) {
                 tick={{ fill: 'var(--fg-dim)', fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => v.toFixed(1) + '%'}
+                tickFormatter={monthlyAxisFmt}
                 width={60}
               />
               <Tooltip
                 contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border-strong)', borderRadius: 6, fontSize: 12 }}
                 labelStyle={{ color: 'var(--fg)' }}
                 itemStyle={{ color: 'var(--fg)' }}
-                formatter={(v) => [v.toFixed(2) + '%', 'Monthly TWR']}
+                formatter={(v) => [monthlyFmt(v), monthlyLabel]}
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
               />
               <ReferenceLine y={0} stroke="var(--fg-dim)" strokeDasharray="3 3" />
-              <Bar dataKey="ret" radius={[4, 4, 0, 0]} maxBarSize={42}>
-                {monthlyReturns.map((m, i) => (
-                  <Cell key={i} fill={m.ret >= 0 ? 'var(--success)' : 'var(--danger)'} />
+              <Bar dataKey="val" radius={[4, 4, 0, 0]} maxBarSize={42}>
+                {monthlyChart.map((m, i) => (
+                  <Cell key={i} fill={m.val >= 0 ? 'var(--success)' : 'var(--danger)'} />
                 ))}
               </Bar>
             </BarChart>
