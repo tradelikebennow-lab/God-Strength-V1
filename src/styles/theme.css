@@ -1445,3 +1445,209 @@ input:focus, select:focus, textarea:focus {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
+
+/* =============================================================
+ *  APPLE GLASS LAYER — appended override theme (2026-06-12)
+ *  Apple dark-mode system palette + SF Pro stack on frosted
+ *  glass panels. Later rules at equal specificity win, so this
+ *  block re-skins the app without touching the rules above.
+ *  To revert: delete everything below this banner.
+ * ============================================================= */
+
+:root {
+  /* Apple dark gray ladder */
+  --bg-0: #000000;
+  --bg-1: #0d0d0f;
+  --bg-2: #1d1d1f;
+  --bg-3: #2c2c2e;
+  --bg-4: #3a3a3c;
+
+  /* Apple blues */
+  --primary: #2997ff;
+  --primary-hover: #5ab2ff;
+  --primary-dim: #0071e3;
+  --primary-glow: rgba(41, 151, 255, 0.14);
+  --accent: #2997ff;
+  --accent-dim: #0071e3;
+
+  /* Apple system semantic colors (dark mode) */
+  --success: #30d158;
+  --success-dim: #248a3d;
+  --success-glow: rgba(48, 209, 88, 0.14);
+  --danger: #ff453a;
+  --danger-dim: #d70015;
+  --danger-glow: rgba(255, 69, 58, 0.14);
+  --warning: #ff9f0a;
+  --warning-dim: #c77700;
+
+  /* Apple text grays */
+  --fg: #f5f5f7;
+  --fg-muted: #d2d2d7;
+  --fg-dim: #a1a1a6;
+  --fg-faint: #6e6e73;
+
+  /* Hairline luminous borders */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Softer, larger Apple radii */
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* SF Pro everywhere; numerals get tabular figures via .mono */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 24px rgba(41, 151, 255, 0.18);
+}
+
+body {
+  background: var(--bg-0);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  background:
+    radial-gradient(ellipse 70% 42% at 50% -12%, rgba(41, 151, 255, 0.07), transparent),
+    radial-gradient(ellipse 50% 35% at 92% 100%, rgba(48, 209, 88, 0.03), transparent);
+}
+
+/* Tabular numerals replace the monospace face (Apple-style data) */
+.mono { font-family: var(--font-ui); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.table td, .stat-value, .hero-value { font-variant-numeric: tabular-nums; }
+
+/* ---- Frosted nav (the apple.com recipe) ---- */
+.topbar {
+  background: rgba(22, 22, 23, 0.7);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tab-btn { border-radius: 999px; font-weight: 400; }
+.tab-btn:hover { color: var(--fg); background: rgba(255, 255, 255, 0.06); }
+.tab-btn.active { color: var(--fg); background: rgba(255, 255, 255, 0.10); }
+
+/* ---- Glass panels ---- */
+.panel {
+  background: rgba(29, 29, 31, 0.62);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, var(--shadow-lg);
+  transition: border-color 250ms ease;
+}
+.panel:hover { border-color: var(--border-strong); }
+
+.stat-card {
+  background: rgba(29, 29, 31, 0.62);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+}
+.stat-card:hover { border-color: var(--border-strong); }
+
+.hero-card {
+  background: linear-gradient(160deg, rgba(41, 151, 255, 0.12), rgba(29, 29, 31, 0.6) 58%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, var(--shadow-lg);
+}
+.hero-card::before { background: none; }
+
+/* ---- Sentence-case Apple typography (no shouting) ---- */
+.dash-section-title,
+.panel-title {
+  text-transform: none;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.stat-label,
+.hero-label,
+.filter-label,
+.balance-meta,
+.breach-detail,
+.payout-component-label {
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.table th { text-transform: none; letter-spacing: -0.01em; font-weight: 500; }
+
+/* ---- iOS segmented-control chips ---- */
+.filter-chips {
+  background: rgba(118, 118, 128, 0.20);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+  width: fit-content;
+}
+.filter-chip {
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 13px;
+  color: var(--fg-dim);
+}
+.filter-chip:hover { color: var(--fg); background: transparent; }
+.filter-chip.active {
+  background: rgba(99, 99, 102, 0.85);
+  color: var(--fg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- Buttons: Apple CTA blue ---- */
+.btn { border-radius: 999px; }
+.btn-primary { background: var(--primary-dim); border-color: var(--primary-dim); }
+.btn-primary:hover { background: var(--primary); border-color: var(--primary); }
+.btn-icon { border-radius: 999px; }
+
+/* ---- Currency toggle as segmented control ---- */
+.currency-toggle {
+  background: rgba(118, 118, 128, 0.20);
+  border: none;
+  border-radius: 9px;
+  padding: 2px;
+}
+.currency-toggle button { border-radius: 7px; }
+.currency-toggle button.active {
+  background: rgba(99, 99, 102, 0.85);
+  color: var(--fg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- Modals: heavier glass ---- */
+.modal-overlay { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.modal-content {
+  background: rgba(29, 29, 31, 0.92);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+}
+
+/* ---- Save pill keeps Apple grays ---- */
+.save-pill-saving { border-color: var(--border-strong); }
+
+/* ---- Auth card ---- */
+.auth-card {
+  background: rgba(29, 29, 31, 0.7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
