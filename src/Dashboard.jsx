@@ -12,7 +12,7 @@ import { byInstrument } from '../analytics/breakdowns.js';
 import { payoutProjection, projectedYearEndBalance } from '../analytics/extras.js';
 import { buildBenchmarkCurve } from '../data/sp500.js';
 import { BENCHMARKS, loadIndexCloses, buildBenchmarkCurveFromCloses } from '../data/benchmarks.js';
-import { fmtCur, fmtPct, fmtR, tradesToUSD } from '../utils/currency.js';
+import { fmtCur, fmtPct, fmtR } from '../utils/currency.js';
 import { dateYear } from '../utils/dates.js';
 
 export default function Dashboard({ state, filters }) {
@@ -40,13 +40,8 @@ export default function Dashboard({ state, filters }) {
     });
     const accountStats = port.accountStats;
 
-    // USD-normalized trades for UI-level aggregation: EUR-account PnL is
-    // FX-converted BEFORE summing (portfolio.js does its own conversion;
-    // these panel sums previously added EUR + USD raw).
-    const usdTrades = tradesToUSD(trades, accounts);
-
     // Filtered trades for stats panel — must respect ALL three filters
-    const filteredTrades = usdTrades.filter((t) => {
+    const filteredTrades = trades.filter((t) => {
       if (year && dateYear(t.filledDate) !== year) return false;
       if (accountId && t.accountId !== accountId) return false;
       if (strategy && !matchesStrategy(t.timeframe, strategy)) return false;
@@ -79,8 +74,8 @@ export default function Dashboard({ state, filters }) {
       breakevens: filteredTrades.length - winners.length - losers.length,
     };
 
-    // Instrument breakdown (USD-normalized PnL)
-    const instBd = byInstrument(usdTrades, { year, accountId, strategy });
+    // Instrument breakdown
+    const instBd = byInstrument(trades, { year, accountId, strategy });
     const instRows = Object.entries(instBd)
       .map(([name, s]) => ({
         instrument: name,
@@ -369,10 +364,9 @@ export default function Dashboard({ state, filters }) {
         />
       </div>
 
-      {/* ---- PROJECTIONS (each panel independent) ---- */}
-      {((cfPayoutProj && cfPayoutProj.total > 0) || pepProj) && (
+      {/* ---- PAYOUT PROJECTION ---- */}
+      {cfPayoutProj && cfPayoutProj.total > 0 && (
         <div className="dash-two-col">
-          {cfPayoutProj && cfPayoutProj.total > 0 && (
           <div className="panel">
             <div className="dash-section-title">Payout Projection · Campus Fund {year || ''}</div>
             <div className="payout-component">
@@ -408,7 +402,6 @@ export default function Dashboard({ state, filters }) {
               <div className="payout-total-value">{$(cfPayoutProj.total)}</div>
             </div>
           </div>
-          )}
 
           {pepProj && (
             <div className="panel">
@@ -433,7 +426,7 @@ export default function Dashboard({ state, filters }) {
                 <div className="payout-component">
                   <div className="payout-component-label">Estimated Annual Return</div>
                   <div className={`payout-component-value ${pepProj.projectedYearEnd > pepProj.currentBalance ? 'pos' : 'neg'}`}>
-                    {fmtPct(Math.pow(1 + pepProj.avgMonthlyTwr, 12) - 1, 1, true)}
+                    {fmtPct((pepProj.projectedYearEnd / accounts.find(a => a.id === 'pepperstone').initialBalance) - 1, 1, true)}
                   </div>
                 </div>
               </div>

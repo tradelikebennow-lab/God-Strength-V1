@@ -72,6 +72,7 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
     if (!form.instrument) e.instrument = 'Required';
     if (!form.entry) e.entry = 'Required';
     if (!form.stop) e.stop = 'Required';
+    if (!form.tp1) e.tp1 = 'Required'; // R/result are garbage without it
     if (!form.filledDate) e.filledDate = 'Required';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -79,13 +80,15 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
 
   function handleSubmit() {
     if (!validate()) return;
+    // Defaults are applied BEFORE enrichTrade computes R/result/PnL.
+    // (Previously a blank exit fell into the computation as price 0 and
+    // produced absurd R-multiples like −20R.)
     const final = enrichTrade({
       ...form,
+      exitPrice: form.exitPrice || form.tp1,
       market: form.market || detectMarket(form.instrument),
     });
     if (!final.id) final.id = `t-${Date.now()}`;
-    if (!final.tp1) final.tp1 = final.entry; // sane default
-    if (!final.exitPrice) final.exitPrice = final.tp1;
     // Estimate PnL roughly from R-multiple × risk if not provided
     if (!final.totalPnl && final.riskPct) {
       const acct = accounts.find((a) => a.id === final.accountId);
@@ -165,7 +168,7 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
               <Field label="Stop Loss" error={errors.stop} required>
                 <input type="number" step="any" value={form.stop || ''} onChange={(e) => setField('stop', parseFloat(e.target.value) || 0)} />
               </Field>
-              <Field label="TP1 Price">
+              <Field label="TP1 Price" error={errors.tp1} required>
                 <input type="number" step="any" value={form.tp1 || ''} onChange={(e) => setField('tp1', parseFloat(e.target.value) || 0)} />
               </Field>
               <Field label="Trailing/Exit">

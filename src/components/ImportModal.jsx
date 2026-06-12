@@ -25,6 +25,7 @@ export default function ImportModal({ open, accounts, onClose, onReplace, onRest
   const [previewTx, setPreviewTx] = useState([]);
   const [jsonState, setJsonState] = useState(null);
   const [errors, setErrors] = useState([]);
+  const [busy, setBusy] = useState(false);
 
   if (!open) return null;
 
@@ -37,6 +38,7 @@ export default function ImportModal({ open, accounts, onClose, onReplace, onRest
     setPreviewTx([]);
     setJsonState(null);
     setErrors([]);
+    setBusy(false);
   }
 
   async function handleFile(e) {
@@ -66,18 +68,23 @@ export default function ImportModal({ open, accounts, onClose, onReplace, onRest
     e.target.value = '';
   }
 
-  function handleJsonConfirm() {
-    if (!jsonState) return;
-    // JSON restore replaces everything (accounts, settings, trades, transactions) verbatim
-    if (typeof onRestoreFull === 'function') {
-      onRestoreFull(jsonState);
-    } else {
-      // Defensive fallback — should not happen since App always passes it
-      onReplace(jsonState);
+  async function handleJsonConfirm() {
+    if (!jsonState || busy) return;
+    setBusy(true);
+    setErrors([]);
+    try {
+      // JSON restore replaces everything (accounts, settings, trades, transactions).
+      // The handler writes to the database FIRST — "done" means actually saved.
+      const handler = typeof onRestoreFull === 'function' ? onRestoreFull : onReplace;
+      await handler(jsonState);
+      setPreviewTrades(jsonState.trades || []);
+      setPreviewTx(jsonState.transactions || []);
+      setStep('done');
+    } catch (err) {
+      setErrors([`Restore failed — nothing was changed in the database: ${err.message}`]);
+    } finally {
+      setBusy(false);
     }
-    setPreviewTrades(jsonState.trades || []);
-    setPreviewTx(jsonState.transactions || []);
-    setStep('done');
   }
 
   function handleParse() {
@@ -101,10 +108,21 @@ export default function ImportModal({ open, accounts, onClose, onReplace, onRest
     setStep('preview');
   }
 
-  function handleConfirm() {
-    const newState = buildReplacementState(previewTrades, previewTx, accounts);
-    onReplace(newState);
-    setStep('done');
+  async function handleConfirm() {
+    if (busy) return;
+    setBusy(true);
+    setErrors([]);
+    try {
+      const newState = buildReplacementState(previewTrades, previewTx, accounts);
+      // Awaits the atomic DB write — the success screen is never shown
+      // before the data is actually persisted.
+      await onReplace(newState);
+      setStep('done');
+    } catch (err) {
+      setErrors([`Import failed — your existing data is untouched: ${err.message}`]);
+    } finally {
+      setBusy(false);
+    }
   }
 
   function handleDone() {
@@ -217,11 +235,11 @@ export default function ImportModal({ open, accounts, onClose, onReplace, onRest
               </div>
 
               <div className="modal-actions">
-                <button className="btn" onClick={reset}>
+                <button className="btn" onClick={reset} disabled={busy}>
                   Cancel
                 </button>
-                <button className="btn btn-danger" onClick={handleConfirm}>
-                  Replace All Data
+                <button className="btn btn-danger" onClick={handleConfirm} disabled={busy}>
+                  {busy ? 'Writing to database…' : 'Replace All Data'}
                 </button>
               </div>
             </div>
@@ -256,10 +274,17 @@ export default function ImportModal({ open, accounts, onClose, onReplace, onRest
                 and replace it with the backup contents. This cannot be undone.
               </div>
 
+              {errors.length > 0 && (
+                <div className="warn-box">
+                  <strong>Error:</strong>
+                  <ul>{errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                </div>
+              )}
+
               <div className="modal-actions">
-                <button className="btn" onClick={reset}>Cancel</button>
-                <button className="btn btn-danger" onClick={handleJsonConfirm}>
-                  Restore Backup
+                <button className="btn" onClick={reset} disabled={busy}>Cancel</button>
+                <button className="btn btn-danger" onClick={handleJsonConfirm} disabled={busy}>
+                  {busy ? 'Writing to database…' : 'Restore Backup'}
                 </button>
               </div>
             </div>

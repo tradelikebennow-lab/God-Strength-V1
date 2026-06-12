@@ -6,7 +6,7 @@ import MiniTable from '../components/MiniTable.jsx';
 import { computeAccountStats } from '../analytics/account.js';
 import { byStrategy, byDirection, byTradeType, byLOIFreshness, byMarket, byInstrument, allAccountsComparison } from '../analytics/breakdowns.js';
 import { marketZoneSizes, concurrentTrades, rDistribution, dayOfWeekStats, holdTimeVsR } from '../analytics/extras.js';
-import { fmtCur, fmtPct, fmtR } from '../utils/currency.js';
+import { fmtCur, fmtPct, fmtR, tradesToUSD } from '../utils/currency.js';
 import { dateMonth } from '../utils/dates.js';
 
 const MONTHS = ['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -30,13 +30,17 @@ export default function InDepth({ state, filters }) {
 
     const filters2 = { accountId, year, strategy, month: monthFilterApplied };
 
-    const strategyBd = byStrategy(trades, filters2);
-    const directionBd = byDirection(trades, filters2);
-    const typeBd = byTradeType(trades, filters2);
-    const loiBd = byLOIFreshness(trades, filters2);
-    const marketBd = byMarket(trades, filters2);
-    const instBd = byInstrument(trades, filters2);
-    const compareRows = allAccountsComparison(accounts, trades, transactions, { year, strategy, month: monthFilterApplied });
+    // USD-normalized PnL for cross-account aggregation (EUR + USD must not
+    // be summed raw). R-multiples and win rates are currency-agnostic.
+    const usdTrades = tradesToUSD(trades, accounts);
+
+    const strategyBd = byStrategy(usdTrades, filters2);
+    const directionBd = byDirection(usdTrades, filters2);
+    const typeBd = byTradeType(usdTrades, filters2);
+    const loiBd = byLOIFreshness(usdTrades, filters2);
+    const marketBd = byMarket(usdTrades, filters2);
+    const instBd = byInstrument(usdTrades, filters2);
+    const compareRows = allAccountsComparison(accounts, usdTrades, transactions, { year, strategy, month: monthFilterApplied });
 
     const zones = marketZoneSizes(trades, { year });
     const concurrent = accountId
@@ -51,7 +55,10 @@ export default function InDepth({ state, filters }) {
   }, [accounts, trades, transactions, year, accountId, strategy, monthFilterApplied]);
 
   const { accStats, strategyBd, directionBd, typeBd, loiBd, marketBd, instBd, compareRows, zones, concurrent, rDist, dow, holdScatter } = M;
+  // $ — native currency of the selected account (single-account stat cards).
+  // $usd — breakdown tables, whose PnL is always USD-normalized above.
   const $ = (v) => fmtCur(v, account?.currency || 'USD', currencyMode, eurFx);
+  const $usd = (v) => fmtCur(v, 'USD', currencyMode, eurFx);
 
   /* --- Helpers --- */
   const renderBreakdown = (title, groups) => {
@@ -150,7 +157,7 @@ export default function InDepth({ state, filters }) {
             { key: 'count', label: 'Trades', align: 'right' },
             { key: 'winRate', label: 'WR', align: 'right', format: (v) => fmtPct(v, 0, false) },
             { key: 'totalR', label: 'Total R', align: 'right', format: (v) => fmtR(v, 2, true), tone: true },
-            { key: 'totalPnl', label: 'PnL', align: 'right', format: (v) => $(v), tone: true },
+            { key: 'totalPnl', label: 'PnL', align: 'right', format: (v) => $usd(v), tone: true },
             { key: 'expectancy', label: 'Exp', align: 'right', format: (v) => fmtR(v, 2, true), tone: true },
             { key: 'profitFactor', label: 'PF', align: 'right', format: (v) => isFinite(v) ? v.toFixed(2) : '∞' },
           ]}
@@ -190,7 +197,7 @@ export default function InDepth({ state, filters }) {
               { key: 'count', label: 'Trades', align: 'right' },
               { key: 'winRate', label: 'WR', align: 'right', format: (v) => fmtPct(v, 0, false) },
               { key: 'totalR', label: 'Total R', align: 'right', format: (v) => fmtR(v, 2, true), tone: true },
-              { key: 'totalPnl', label: 'PnL', align: 'right', format: (v) => $(v), tone: true },
+              { key: 'totalPnl', label: 'PnL', align: 'right', format: (v) => $usd(v), tone: true },
               { key: 'profitFactor', label: 'PF', align: 'right', format: (v) => isFinite(v) ? v.toFixed(2) : '∞' },
               { key: 'expectancy', label: 'Exp', align: 'right', format: (v) => fmtR(v, 2, true), tone: true },
             ]}
@@ -218,6 +225,8 @@ export default function InDepth({ state, filters }) {
               <YAxis tick={{ fill: 'var(--fg-dim)', fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border-strong)', borderRadius: 6, fontSize: 12 }}
+                labelStyle={{ color: 'var(--fg)' }}
+                itemStyle={{ color: 'var(--fg)' }}
               />
               <Bar dataKey="count" fill="var(--primary)" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -263,6 +272,8 @@ export default function InDepth({ state, filters }) {
             <Tooltip
               cursor={{ strokeDasharray: '3 3', stroke: 'var(--fg-dim)' }}
               contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border-strong)', borderRadius: 6, fontSize: 12 }}
+              labelStyle={{ color: 'var(--fg)' }}
+              itemStyle={{ color: 'var(--fg)' }}
               formatter={(v, name) => [typeof v === 'number' ? v.toFixed(2) : v, name]}
             />
             <Scatter
@@ -293,7 +304,7 @@ export default function InDepth({ state, filters }) {
             { key: 'count', label: 'Trades', align: 'right', sortable: true },
             { key: 'winRate', label: 'WR', align: 'right', sortable: true, format: (v) => fmtPct(v, 0, false) },
             { key: 'totalR', label: 'Total R', align: 'right', sortable: true, format: (v) => fmtR(v, 2, true), tone: true },
-            { key: 'totalPnl', label: 'PnL', align: 'right', sortable: true, format: (v) => $(v), tone: true },
+            { key: 'totalPnl', label: 'PnL', align: 'right', sortable: true, format: (v) => $usd(v), tone: true },
           ]}
           rows={Object.entries(instBd).map(([name, s]) => ({
             instrument: name,

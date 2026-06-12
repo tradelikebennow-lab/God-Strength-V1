@@ -20,6 +20,8 @@ export default function TopBar({
   onImportClick,
   onExportClick,
   onSignOut,
+  saveStatus = 'saved',
+  onRetrySave,
 }) {
   return (
     <header className="topbar">
@@ -35,6 +37,19 @@ export default function TopBar({
         <TabNav active={activeTab} onChange={onTabChange} />
 
         <div className="filter-bar">
+          {saveStatus === 'saving' && (
+            <span className="save-pill save-pill-saving" title="Writing changes to the database…">Saving…</span>
+          )}
+          {saveStatus === 'error' && (
+            <button
+              className="save-pill save-pill-error"
+              onClick={onRetrySave}
+              title="Last save failed — your latest changes are NOT in the database yet. Click to retry."
+            >
+              ⚠ Save failed — Retry
+            </button>
+          )}
+
           <CurrencyToggle value={currencyMode} onChange={onCurrencyChange} />
 
           <FilterPopover

@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from './data/supabaseClient.js';
-import { loadStateFromDb, persistDiff } from './data/db.js';
+import { loadStateFromDb, persistDiff, replaceJournal } from './data/db.js';
 import { exportJSON } from './data/storage.js';
 import { dateYear } from './utils/dates.js';
 import AuthGate from './components/AuthGate.jsx';
@@ -28,16 +28,27 @@ export default function App() {
   }, []);
 
   // ---- App state (persisted in Supabase) ----
-  // prevStateRef always holds the last state KNOWN to be in the database;
-  // the persist effect diffs against it and writes only what changed.
+  // lastSavedRef always holds the last state CONFIRMED to be in the database.
+  // It only advances when a write succeeds, so no failure ordering can ever
+  // orphan a diff. stateRef mirrors the latest state for use inside the
+  // serialized save queue.
   const [state, setState] = useState(null);
   const [loadError, setLoadError] = useState(null);
-  const prevStateRef = useRef(null);
+  const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'saving' | 'error'
+  const lastSavedRef = useRef(null);
+  const stateRef = useRef(null);
+  stateRef.current = state;
+  const queueRef = useRef(Promise.resolve());
 
+  // Keyed on the USER id, not the session object: hourly TOKEN_REFRESHED
+  // events produce a new session object and must NOT re-fetch the DB over
+  // unsaved local state.
+  const userId = session?.user?.id ?? null;
   useEffect(() => {
-    if (!session) {
+    if (!userId) {
       setState(null);
-      prevStateRef.current = null;
+      lastSavedRef.current = null;
+      setSaveStatus('saved');
       return;
     }
     let active = true;
@@ -45,28 +56,59 @@ export default function App() {
     loadStateFromDb()
       .then((s) => {
         if (!active) return;
-        prevStateRef.current = s;
+        lastSavedRef.current = s;
         setState(s);
+        setSaveStatus('saved');
       })
       .catch((err) => {
         console.error('[app] load failed', err);
         if (active) setLoadError(err.message || 'Failed to load data');
       });
     return () => { active = false; };
-  }, [session]);
+  }, [userId]);
 
-  // ---- Persist changes (diff against last-saved state) ----
-  useEffect(() => {
-    if (!state || !prevStateRef.current || state === prevStateRef.current) return;
-    const prev = prevStateRef.current;
-    prevStateRef.current = state;
-    persistDiff(prev, state).catch((err) => {
-      console.error('[app] save failed', err);
-      // Roll the baseline back so the failed change is retried on next save.
-      prevStateRef.current = prev;
-      alert(`Save failed: ${err.message}\n\nYour last change was NOT saved — check your connection and retry.`);
+  // ---- Serialized persistence queue ----
+  // Each queued run diffs from the last CONFIRMED db state to the LATEST
+  // app state. Runs never overlap, so concurrent upserts/deletes can't land
+  // out of order, and a failed save leaves lastSavedRef untouched — the
+  // next run (or a manual Retry) picks the full outstanding diff back up.
+  const schedulePersist = useCallback(() => {
+    queueRef.current = queueRef.current.then(async () => {
+      const base = lastSavedRef.current;
+      const target = stateRef.current;
+      if (!base || !target || base === target) return;
+      setSaveStatus('saving');
+      try {
+        await persistDiff(base, target);
+        lastSavedRef.current = target;
+        setSaveStatus(stateRef.current === target ? 'saved' : 'saving');
+      } catch (err) {
+        console.error('[app] save failed', err);
+        setSaveStatus('error');
+      }
     });
-  }, [state]);
+  }, []);
+
+  useEffect(() => {
+    if (!state || !lastSavedRef.current || state === lastSavedRef.current) return;
+    schedulePersist();
+  }, [state, schedulePersist]);
+
+  const handleRetrySave = useCallback(() => {
+    schedulePersist();
+  }, [schedulePersist]);
+
+  // ---- Warn before closing the tab with unsaved changes ----
+  useEffect(() => {
+    function onBeforeUnload(e) {
+      if (saveStatus !== 'saved' || (state && lastSavedRef.current !== state)) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [saveStatus, state]);
 
   // ---- UI state (ephemeral) ----
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -101,16 +143,32 @@ export default function App() {
   }, []);
 
   // ---- Import handler (xlsx — preserves accounts + settings) ----
-  const handleReplace = useCallback((newState) => {
-    setState((s) => ({
+  // Writes to the DB FIRST (atomic RPC), then swaps local state. The
+  // ImportModal awaits this, so its "done" screen means actually done.
+  const handleReplace = useCallback(async (newState) => {
+    const s = stateRef.current;
+    const next = {
       ...newState,
       accounts: s.accounts, // preserve account config
       settings: s.settings,
-    }));
+    };
+    await replaceJournal(next.trades, next.transactions);
+    lastSavedRef.current = next;
+    setState(next);
+    setSaveStatus('saved');
   }, []);
 
-  // ---- Restore handler (JSON backup — replaces everything verbatim) ----
-  const handleRestoreFull = useCallback((newState) => {
+  // ---- Restore handler (JSON backup — replaces everything) ----
+  // trades/transactions go through the atomic RPC; account/settings
+  // changes ride the normal diff queue afterwards.
+  const handleRestoreFull = useCallback(async (newState) => {
+    const s = stateRef.current;
+    await replaceJournal(newState.trades, newState.transactions);
+    lastSavedRef.current = {
+      ...newState,
+      accounts: s.accounts,
+      settings: s.settings,
+    };
     setState(newState);
   }, []);
 
@@ -167,6 +225,8 @@ export default function App() {
         onImportClick={() => setImportOpen(true)}
         onExportClick={handleExport}
         onSignOut={handleSignOut}
+        saveStatus={saveStatus}
+        onRetrySave={handleRetrySave}
       />
 
       <main className="app-main animate-in">

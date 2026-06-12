@@ -1,7 +1,14 @@
 // src/data/import.js
 import * as XLSX from 'xlsx';
 import { DEFAULT_ACCOUNTS } from './defaults.js';
-import { SCHEMA_VERSION } from './schema.js';
+import {
+  SCHEMA_VERSION,
+  TRADE_RESULTS,
+  TRADE_TYPES,
+  MARKETS,
+  TIMEFRAMES,
+  TRANSACTION_TYPES,
+} from './schema.js';
 
 /* ------------------------------------------------------------------ *
  *  Header normalization
@@ -81,8 +88,16 @@ function excelDateToISO(val) {
     // Already a date string
     const m = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    // Non-ISO string (e.g. "5/12/2025"): use LOCAL date components.
+    // toISOString() here would convert local midnight to UTC and shift
+    // the date back one day in GMT+8.
     const d = new Date(val);
-    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    if (!isNaN(d)) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
     return null;
   }
   if (val instanceof Date) {
@@ -106,6 +121,21 @@ function num(val, fallback = 0) {
 function str(val, fallback = '') {
   if (val == null) return fallback;
   return String(val).trim();
+}
+
+/**
+ * Coerce a value to one of the allowed enum values (Postgres CHECK
+ * constraints reject anything else — and one bad cell would fail the
+ * ENTIRE multi-row insert). Case-insensitive match; otherwise fallback
+ * with a warning pushed to `errors`.
+ */
+function coerceEnum(val, allowed, fallback, errors, rowNum, field) {
+  const s = str(val);
+  if (!s) return fallback;
+  const hit = allowed.find((a) => a.toLowerCase() === s.toLowerCase());
+  if (hit) return hit;
+  errors.push(`Row ${rowNum}: invalid ${field} "${s}" → using "${fallback}"`);
+  return fallback;
 }
 
 /* ------------------------------------------------------------------ *
@@ -194,11 +224,11 @@ export function parseTrades(wb, sheetName, accounts = DEFAULT_ACCOUNTS) {
       filledDate,
       tp1Date: excelDateToISO(row[idx.tp1Date]),
       closeDate: excelDateToISO(row[idx.closeDate]) ?? filledDate,
-      market: str(row[idx.market]) || 'Forex',
+      market: coerceEnum(row[idx.market], MARKETS, 'Forex', errors, i + 1, 'market'),
       direction: str(row[idx.direction]) === 'Sell' ? 'Sell' : 'Buy',
       instrument: str(row[idx.instrument]).toUpperCase(),
-      timeframe: str(row[idx.timeframe]) || '4H',
-      status: str(row[idx.status]) || 'Closed',
+      timeframe: coerceEnum(row[idx.timeframe], TIMEFRAMES, '4H', errors, i + 1, 'timeframe'),
+      status: coerceEnum(row[idx.status], ['Open', 'Closed'], 'Closed', errors, i + 1, 'status'),
       beAt11: str(row[idx.beAt11]) === 'Yes' ? 'Yes' : 'No',
       tp1R: num(row[idx.tp1R]),
       tp2R: num(row[idx.tp2R]),
@@ -206,7 +236,7 @@ export function parseTrades(wb, sheetName, accounts = DEFAULT_ACCOUNTS) {
       tp1Pnl: num(row[idx.tp1Pnl]),
       tp2Pnl: num(row[idx.tp2Pnl]),
       totalPnl: num(row[idx.totalPnl]),
-      result: str(row[idx.result]) || 'Breakeven',
+      result: coerceEnum(row[idx.result], TRADE_RESULTS, 'Breakeven', errors, i + 1, 'result'),
       entry: num(row[idx.entry]),
       stop: num(row[idx.stop]),
       tp1: num(row[idx.tp1]),
@@ -214,7 +244,7 @@ export function parseTrades(wb, sheetName, accounts = DEFAULT_ACCOUNTS) {
       streak: num(row[idx.streak]),
       isWinner: num(row[idx.isWinner]) ? 1 : 0,
       nonBreakeven: num(row[idx.nonBreakeven]) ? 1 : 0,
-      tradeType: str(row[idx.tradeType]) || 'Sideways',
+      tradeType: coerceEnum(row[idx.tradeType], TRADE_TYPES, 'Sideways', errors, i + 1, 'tradeType'),
       lol: str(row[idx.lol]) === 'Yes' ? 'Yes' : 'No',
       mtfCoverage: str(row[idx.mtfCoverage]) === 'Yes' ? 'Yes' : 'No',
       loiFreshness: str(row[idx.loiFreshness]) === 'Yes' ? 'Yes' : 'No',
@@ -241,9 +271,14 @@ export function parseTransactions(wb, sheetName, accounts = DEFAULT_ACCOUNTS) {
     if (!row || row.every((v) => v == null || v === '')) continue;
     const date = excelDateToISO(row[idx.date]);
     const accountName = str(row[idx.accountName]);
-    const type = str(row[idx.type]);
+    const rawType = str(row[idx.type]);
     const amount = num(row[idx.amount], NaN);
-    if (!date || !accountName || !type || !isFinite(amount)) continue;
+    if (!date || !accountName || !rawType || !isFinite(amount)) continue;
+    const type = TRANSACTION_TYPES.find((t) => t.toLowerCase() === rawType.toLowerCase());
+    if (!type) {
+      errors.push(`Row ${i + 1}: invalid transaction type "${rawType}" — skipped`);
+      continue;
+    }
     const accountId = resolveAccountId(accountName, accounts);
     if (!accountId) {
       errors.push(`Row ${i + 1}: unknown account "${accountName}"`);

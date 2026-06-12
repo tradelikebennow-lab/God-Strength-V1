@@ -79,12 +79,29 @@ const TX_MAP = {
 // date-typed columns reject '' — normalize empties to null
 const DATE_FIELDS = new Set(['filledDate', 'tp1Date', 'closeDate', 'date']);
 
+// Postgres `numeric` columns come back from PostgREST as STRINGS (precision
+// safety). The app's analytics do arithmetic on these fields, so they must
+// be coerced back to JS numbers on load.
+const NUMERIC_FIELDS = new Set([
+  // accounts
+  'initialBalance', 'riskPct', 'tierStart', 'breachFloor', 'payoutSplit', 'fxRate',
+  // trades
+  'tp1R', 'tp2R', 'totalR', 'tp1Pnl', 'tp2Pnl', 'totalPnl',
+  'entry', 'stop', 'tp1', 'exitPrice', 'streak', 'isWinner', 'nonBreakeven',
+  // transactions
+  'amount', 'newHardLimit', 'profitSplit',
+]);
+
 function toDb(row, map) {
   const out = {};
   for (const [appKey, dbKey] of Object.entries(map)) {
     let v = row[appKey];
     if (v === undefined) v = null;
     if (DATE_FIELDS.has(appKey) && v === '') v = null;
+    if (v !== null && v !== '' && NUMERIC_FIELDS.has(appKey)) {
+      const n = Number(v);
+      if (!Number.isNaN(n)) v = n;
+    }
     out[dbKey] = v;
   }
   return out;
@@ -93,7 +110,9 @@ function toDb(row, map) {
 function fromDb(row, map) {
   const out = {};
   for (const [appKey, dbKey] of Object.entries(map)) {
-    out[appKey] = row[dbKey] === undefined ? null : row[dbKey];
+    let v = row[dbKey] === undefined ? null : row[dbKey];
+    if (v !== null && NUMERIC_FIELDS.has(appKey)) v = Number(v);
+    out[appKey] = v;
   }
   return out;
 }
@@ -143,6 +162,19 @@ async function seedDefaults() {
   });
   throwIf(setErr, 'seed settings');
   return defaults;
+}
+
+/* ----------------------------------------------------------------
+ * Replace All (atomic, via RPC — see migrations/003_replace_journal.sql)
+ * Deletes + inserts trades/transactions in ONE database transaction,
+ * so a partial failure can never leave old and new rows mixed.
+ * ---------------------------------------------------------------- */
+export async function replaceJournal(trades, transactions) {
+  const { error } = await supabase.rpc('replace_journal', {
+    p_trades: (trades || []).map((t) => toDb(t, TRADE_MAP)),
+    p_transactions: (transactions || []).map((t) => toDb(t, TX_MAP)),
+  });
+  throwIf(error, 'replace journal');
 }
 
 /* ----------------------------------------------------------------

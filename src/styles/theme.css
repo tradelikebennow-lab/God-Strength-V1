@@ -1414,3 +1414,34 @@ input:focus, select:focus, textarea:focus {
   color: var(--fg-dim);
   font-family: var(--font-mono);
 }
+
+/* ---- Save status pill (TopBar) ---- */
+.save-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--text-xs, 11px);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.save-pill-saving {
+  color: var(--fg-dim);
+  border-color: var(--border, rgba(255, 255, 255, 0.12));
+  animation: save-pulse 1.2s ease-in-out infinite;
+}
+.save-pill-error {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+  cursor: pointer;
+}
+.save-pill-error:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+@keyframes save-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}

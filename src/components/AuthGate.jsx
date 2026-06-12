@@ -1,36 +1,25 @@
 // src/components/AuthGate.jsx
-// Login / sign-up screen shown when there is no Supabase session.
+// Login screen shown when there is no Supabase session.
+// Sign-up is intentionally NOT offered: this is a single-user journal.
+// (Also disable signups in Supabase Dashboard → Authentication → Providers
+// → Email → "Allow new users to sign up" OFF, so the API path is closed too.)
 import React, { useState } from 'react';
 import { supabase } from '../data/supabaseClient.js';
 
 export default function AuthGate() {
-  const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
-    setNotice(null);
     setBusy(true);
     try {
-      if (mode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        // onAuthStateChange in App.jsx takes over from here
-      } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data.session) {
-          // Email confirmation disabled — signed in immediately
-        } else {
-          setNotice('Check your email to confirm your account, then sign in.');
-          setMode('signin');
-        }
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      // onAuthStateChange in App.jsx takes over from here
     } catch (err) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -46,9 +35,7 @@ export default function AuthGate() {
           <span className="brand-name">God Strength</span>
           <span className="brand-version">v1</span>
         </div>
-        <div className="auth-subtitle">
-          {mode === 'signin' ? 'Sign in to your trading journal' : 'Create your journal account'}
-        </div>
+        <div className="auth-subtitle">Sign in to your trading journal</div>
 
         <label className="auth-label" htmlFor="auth-email">Email</label>
         <input
@@ -66,7 +53,7 @@ export default function AuthGate() {
           id="auth-password"
           className="auth-input"
           type="password"
-          autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           minLength={6}
@@ -74,18 +61,9 @@ export default function AuthGate() {
         />
 
         {error && <div className="auth-error">{error}</div>}
-        {notice && <div className="auth-notice">{notice}</div>}
 
         <button className="btn btn-primary auth-submit" type="submit" disabled={busy}>
-          {busy ? '…' : mode === 'signin' ? 'Sign In' : 'Sign Up'}
-        </button>
-
-        <button
-          type="button"
-          className="btn-ghost-text auth-toggle"
-          onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); setNotice(null); }}
-        >
-          {mode === 'signin' ? "No account? Sign up" : 'Have an account? Sign in'}
+          {busy ? '…' : 'Sign In'}
         </button>
       </form>
     </div>
