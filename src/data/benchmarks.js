@@ -11,18 +11,29 @@ export const BENCHMARKS = [
   { symbol: 'BTCUSD', label: 'Bitcoin' },
 ];
 
-/** Fetch all closes for all benchmark symbols. Returns { SPX: [{date, close}], ... } */
+/** Fetch all closes for all benchmark symbols. Returns { SPX: [{date, close}], ... }
+ * Paginated: Supabase caps each request at 1000 rows, and with 4 symbols the
+ * table exceeds that — a single query would silently drop the newest dates
+ * and flatten every benchmark to 0%. */
 export async function loadIndexCloses() {
-  const { data, error } = await supabase
-    .from('index_closes')
-    .select('symbol, date, close')
-    .order('date', { ascending: true });
-  if (error) {
-    console.error('[benchmarks] load failed', error);
-    return {};
+  const PAGE = 1000;
+  const all = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('index_closes')
+      .select('symbol, date, close')
+      .order('symbol', { ascending: true })
+      .order('date', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error('[benchmarks] load failed', error);
+      return {};
+    }
+    all.push(...(data || []));
+    if (!data || data.length < PAGE) break;
   }
   const by = {};
-  for (const r of data || []) {
+  for (const r of all) {
     (by[r.symbol] ||= []).push({ date: r.date, close: Number(r.close) });
   }
   return by;
