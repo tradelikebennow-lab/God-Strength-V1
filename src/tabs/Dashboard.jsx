@@ -10,6 +10,8 @@ import { matchesStrategy } from '../analytics/account.js';
 import { computeMonthlyGrid } from '../analytics/monthly.js';
 import { byInstrument } from '../analytics/breakdowns.js';
 import { payoutProjection, projectedYearEndBalance, deriveBreachFloor, dailyLossReport, openRiskExposure } from '../analytics/extras.js';
+import { computeDiscipline } from '../analytics/discipline.js';
+import Creature from '../components/Creature.jsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from 'recharts';
 import { buildBenchmarkCurve } from '../data/sp500.js';
 import { BENCHMARKS, loadIndexCloses, buildBenchmarkCurveFromCloses } from '../data/benchmarks.js';
@@ -29,6 +31,7 @@ export default function Dashboard({ state, filters }) {
     return () => { active = false; };
   }, []);
   const { year, accountId, strategy } = filters;
+  const discipline = useMemo(() => computeDiscipline(accounts, trades, transactions), [accounts, trades, transactions]);
   const currencyMode = settings.currencyMode;
   const eurAccount = accounts.find((a) => a.currency === 'EUR');
   const fxRate = eurAccount?.fxRate || 1.1723;
@@ -231,6 +234,32 @@ export default function Dashboard({ state, filters }) {
               <div className="stat-label">Total Deposits</div>
               <div className="mono" style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>
                 {$(port.totalDeposits)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="dash-section-title">Discipline</div>
+          <div className="creature-panel-row">
+            <Creature discipline={discipline} />
+            <div className="creature-meta">
+              <div className="creature-state" style={{ color: { best: '#ffce5c', thriving: 'var(--success)', healthy: 'var(--primary)', tired: 'var(--warning)', sick: 'var(--danger)', critical: 'var(--danger)' }[discipline.state.key] || 'var(--fg-dim)' }}>{discipline.state.label}</div>
+              <div className="creature-score">
+                {discipline.score != null ? `${discipline.score}/100 · last 14 days · ${discipline.tradeCount} trade${discipline.tradeCount === 1 ? '' : 's'}` : 'No recent activity to judge'}
+              </div>
+              <div className="creature-rules">
+                {discipline.components
+                  .filter((c) => c.available)
+                  .sort((a, b) => a.score - b.score)
+                  .slice(0, 3)
+                  .map((c) => (
+                    <div className="creature-rule" key={c.key}>
+                      <span className="stat-label">{c.label}</span>
+                      <span className="creature-rule-detail">{c.detail}</span>
+                      <span className="creature-rule-score mono" style={{ color: c.score >= 65 ? 'var(--success)' : c.score >= 40 ? 'var(--warning)' : 'var(--danger)' }}>{Math.round(c.score)}</span>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
