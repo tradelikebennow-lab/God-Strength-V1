@@ -1651,3 +1651,52 @@ body::before {
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
 }
+
+/* ---- Discipline creature (pixel pet, 2-frame) ---- */
+/* Bob lives on the container; the inner sprite swaps between the two
+   strip frames via background-position (hard cuts, no interpolation). */
+.creature { position: relative; flex: none; display: grid; place-items: center;
+  animation: creature-bob 1.8s steps(2) infinite; }
+@keyframes creature-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6%); } }
+.creature-sprite { image-rendering: pixelated; position: relative; z-index: 2;
+  background-repeat: no-repeat; background-size: 200% 100%; background-position: 0 0;
+  animation: creature-frames 4.2s infinite; }
+@keyframes creature-frames {
+  0%, 86% { background-position: 0 0; }
+  86.01%, 95% { background-position: 100% 0; }
+  95.01%, 100% { background-position: 0 0; }
+}
+.creature-glow { position: absolute; inset: -22% -10%; z-index: 1; border-radius: 50%;
+  background: radial-gradient(circle at 50% 56%, var(--orb-glow, rgba(255,255,255,0.12)), transparent 66%);
+  animation: creature-glowpulse 4s ease-in-out infinite; }
+@keyframes creature-glowpulse { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.07); } }
+
+.creature-best     { --orb-hi: #ffe7a1; --orb-mid: #ffce5c; --orb-lo: #a87f1e; --orb-glow: rgba(255, 206, 92, 0.30); }
+.creature-thriving { --orb-hi: #7ee2a1; --orb-mid: #30d158; --orb-lo: #1a7a36; --orb-glow: rgba(48, 209, 88, 0.20); }
+.creature-healthy  { --orb-hi: #8fc7ff; --orb-mid: #2997ff; --orb-lo: #115a99; --orb-glow: rgba(41, 151, 255, 0.18); }
+.creature-resting  { --orb-hi: #d7d7dc; --orb-mid: #98989f; --orb-lo: #4a4a4f; --orb-glow: rgba(255, 255, 255, 0.10); }
+.creature-tired    { --orb-hi: #ffd089; --orb-mid: #ff9f0a; --orb-lo: #9a6206; --orb-glow: rgba(255, 159, 10, 0.16); }
+.creature-sick     { --orb-hi: #ff9d96; --orb-mid: #ff453a; --orb-lo: #8f1d17; --orb-glow: rgba(255, 69, 58, 0.16); }
+.creature-critical { --orb-hi: #ff8077; --orb-mid: #e8281c; --orb-lo: #6e120c; --orb-glow: rgba(255, 69, 58, 0.26); }
+/* per-state idle pacing */
+.creature-best .creature-sprite { animation-duration: 3.6s; }
+.creature-healthy .creature-sprite { animation-duration: 4.6s; }
+.creature-tired .creature-sprite { animation-duration: 3.4s; }
+.creature-sick .creature-sprite, .creature-resting .creature-sprite { animation-duration: 3.4s; }
+.creature-critical .creature-sprite { animation-duration: 1.9s; }
+.creature-critical, .creature-resting { animation-duration: 2.6s; }
+.creature-critical .creature-glow { animation: creature-flicker 1.6s ease-in-out infinite; }
+@keyframes creature-flicker { 0%,100% { opacity: 0.55; } 50% { opacity: 0.2; } }
+@media (prefers-reduced-motion: reduce) {
+  .creature, .creature-sprite, .creature-glow { animation: none; }
+}
+
+.creature-panel-row { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.creature-meta { flex: 1; min-width: 240px; }
+.creature-state { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.creature-score { color: var(--fg-dim); font-size: 13px; margin-top: 2px; }
+.creature-rules { margin-top: 14px; display: grid; gap: 8px; }
+.creature-rule { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
+.creature-rule .stat-label { margin: 0; }
+.creature-rule-detail { color: var(--fg-dim); text-align: right; }
+.creature-rule-score { font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
