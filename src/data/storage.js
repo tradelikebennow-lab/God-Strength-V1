@@ -62,6 +62,29 @@ export async function importJSON(file) {
   if (!Array.isArray(parsed.accounts) || !Array.isArray(parsed.trades) || !Array.isArray(parsed.transactions)) {
     throw new Error('Invalid JSON: missing accounts/trades/transactions arrays');
   }
+  // Shape validation — a hand-edited or foreign backup must fail HERE,
+  // not crash the app after the state has already been swapped in.
+  if (!parsed.settings || typeof parsed.settings !== 'object' || Array.isArray(parsed.settings)) {
+    throw new Error('Invalid backup: missing settings object');
+  }
+  if (!['USD', 'EUR', 'BOTH'].includes(parsed.settings.currencyMode)) {
+    throw new Error(`Invalid backup: settings.currencyMode must be USD/EUR/BOTH (got "${parsed.settings.currencyMode}")`);
+  }
+  for (const [i, a] of parsed.accounts.entries()) {
+    if (!a || typeof a !== 'object' || !a.id || typeof a.name !== 'string') {
+      throw new Error(`Invalid backup: accounts[${i}] missing id/name`);
+    }
+  }
+  for (const [i, t] of parsed.trades.entries()) {
+    if (!t || typeof t !== 'object' || !t.id || !t.accountId || !t.filledDate) {
+      throw new Error(`Invalid backup: trades[${i}] missing id/accountId/filledDate`);
+    }
+  }
+  for (const [i, x] of parsed.transactions.entries()) {
+    if (!x || typeof x !== 'object' || !x.id || !x.accountId || !x.date || typeof x.amount !== 'number') {
+      throw new Error(`Invalid backup: transactions[${i}] missing id/accountId/date/amount`);
+    }
+  }
   return migrateIfNeeded(parsed);
 }
 

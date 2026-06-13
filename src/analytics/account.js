@@ -151,9 +151,35 @@ export function computeAccountStats(account, trades, transactions, opts = {}) {
     }
   }
 
-  // Calmar (annualized) — uses period-start balance as denominator for proper return calculation
+  // Calmar (annualized) — period return divided by PERIOD-MATCHED max DD.
+  // stats.maxDD stays all-time (breach context), but dividing a filtered
+  // year's return by another year's drawdown produces a meaningless ratio,
+  // so Calmar recomputes DD over the filtered window only.
+  let periodMaxDD = maxDD;
+  if (yearFilter) {
+    periodMaxDD = 0;
+    let peak = null; // seeded from balance entering the filter year
+    let prevBal = account.initialBalance;
+    for (const p of timeline) {
+      if (dateYear(p.date) !== yearFilter) {
+        if (dateSort(p.date, `${yearFilter}-01-01`) < 0) prevBal = p.balance;
+        continue;
+      }
+      if (peak === null) peak = prevBal;
+      // Flow-neutralize the peak, mirroring buildBalanceTimeline
+      if (p.type === 'Deposit' || p.type === 'Upgrade' || p.type === 'Adjustment') {
+        peak += p.amount;
+      } else if (p.type === 'Payout' || p.type === 'Withdrawal') {
+        peak -= Math.abs(p.amount);
+      }
+      if (p.balance > peak) peak = p.balance;
+      const dd = peak > 0 ? (p.balance - peak) / peak : 0;
+      if (dd < periodMaxDD) periodMaxDD = dd;
+    }
+  }
+
   let calmar = 0;
-  if (seq.length >= 1 && Math.abs(maxDD) > 0) {
+  if (seq.length >= 1 && Math.abs(periodMaxDD) > 0) {
     const firstDate = seq[0].closeDate || seq[0].filledDate;
     const lastDate = seq[seq.length - 1].closeDate || seq[seq.length - 1].filledDate;
     const days = Math.max(1, dateDiffDays(firstDate, lastDate));
@@ -171,7 +197,7 @@ export function computeAccountStats(account, trades, transactions, opts = {}) {
       }
     }
     const periodReturn = periodStartBalance > 0 ? totalPnl / periodStartBalance : 0;
-    calmar = (periodReturn * (365 / days)) / Math.abs(maxDD);
+    calmar = (periodReturn * (365 / days)) / Math.abs(periodMaxDD);
   }
 
   // YTD PnL — sum trades in current year (or yearFilter)

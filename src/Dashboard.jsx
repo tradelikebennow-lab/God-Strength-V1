@@ -9,11 +9,10 @@ import { computePortfolioMetrics } from '../analytics/portfolio.js';
 import { matchesStrategy } from '../analytics/account.js';
 import { computeMonthlyGrid } from '../analytics/monthly.js';
 import { byInstrument } from '../analytics/breakdowns.js';
-import { payoutProjection, projectedYearEndBalance, deriveBreachFloor, dailyLossReport, openRiskExposure } from '../analytics/extras.js';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from 'recharts';
+import { payoutProjection, projectedYearEndBalance } from '../analytics/extras.js';
 import { buildBenchmarkCurve } from '../data/sp500.js';
 import { BENCHMARKS, loadIndexCloses, buildBenchmarkCurveFromCloses } from '../data/benchmarks.js';
-import { fmtCur, fmtPct, fmtR, tradesToUSD } from '../utils/currency.js';
+import { fmtCur, fmtPct, fmtR } from '../utils/currency.js';
 import { dateYear } from '../utils/dates.js';
 
 export default function Dashboard({ state, filters }) {
@@ -21,7 +20,6 @@ export default function Dashboard({ state, filters }) {
 
   /* ----- Benchmark selection + daily closes (loaded once) ----- */
   const [benchSymbol, setBenchSymbol] = React.useState('SPX');
-  const [monthlyMode, setMonthlyMode] = React.useState('TWR'); // 'TWR' | 'USD' | 'R'
   const [indexCloses, setIndexCloses] = React.useState(null); // null = loading, {} = none
   React.useEffect(() => {
     let active = true;
@@ -42,14 +40,9 @@ export default function Dashboard({ state, filters }) {
     });
     const accountStats = port.accountStats;
 
-    // USD-normalized trades for UI-level aggregation: EUR-account PnL is
-    // FX-converted BEFORE summing (portfolio.js does its own conversion;
-    // these panel sums previously added EUR + USD raw).
-    const usdTrades = tradesToUSD(trades, accounts);
-
     // Filtered trades for stats panel — must respect ALL three filters
-    const filteredTrades = usdTrades.filter((t) => {
-      if (year && dateYear(t.closeDate || t.filledDate) !== year) return false;
+    const filteredTrades = trades.filter((t) => {
+      if (year && dateYear(t.filledDate) !== year) return false;
       if (accountId && t.accountId !== accountId) return false;
       if (strategy && !matchesStrategy(t.timeframe, strategy)) return false;
       return true;
@@ -81,8 +74,8 @@ export default function Dashboard({ state, filters }) {
       breakevens: filteredTrades.length - winners.length - losers.length,
     };
 
-    // Instrument breakdown (USD-normalized PnL)
-    const instBd = byInstrument(usdTrades, { year, accountId, strategy });
+    // Instrument breakdown
+    const instBd = byInstrument(trades, { year, accountId, strategy });
     const instRows = Object.entries(instBd)
       .map(([name, s]) => ({
         instrument: name,
@@ -124,71 +117,10 @@ export default function Dashboard({ state, filters }) {
         : [];
     const benchmarkChartData = benchmarkRaw.map((p) => ({ date: p.date, value: p.benchmark * 100 }));
 
-    // Risk rows: derived breach floor (newHardLimit-aware), daily-loss
-    // report, and open-trade exposure per account.
-    const riskRows = accounts.map((acc) => {
-      const { floor, updatedBy } = deriveBreachFloor(acc, transactions);
-      const daily = dailyLossReport(acc, trades, year);
-      const exposure = openRiskExposure(acc, trades, accountStats[acc.id]?.currentBalance);
-      return { acc, floor, floorUpdatedBy: updatedBy, daily, exposure };
-    });
-
-    // Monthly TWR returns derived from the SAME portfolio curve as the
-    // chart above — respects year/account/strategy scope. Months without
-    // events are skipped.
-    const byMonthEnd = new Map();
-    for (const pt of port.twrCurve) {
-      if (pt.date) byMonthEnd.set(pt.date.slice(0, 7), pt.twr);
-    }
-    const monthKeys = [...byMonthEnd.keys()].sort();
-    let prevTwr = 0;
-    const monthlyReturns = monthKeys.map((k) => {
-      const end = byMonthEnd.get(k);
-      const ret = ((1 + end) / (1 + prevTwr) - 1) * 100;
-      prevTwr = end;
-      return { month: k, ret };
-    });
-
-    // USD + R per close-month from the same filtered, USD-normalized trades
-    // as the stats panel (TWR ignores capital; these show dollars and pure R).
-    const aggByMonth = new Map();
-    for (const t of filteredTrades) {
-      const k = String(t.closeDate || t.filledDate || '').slice(0, 7);
-      if (!k) continue;
-      const cur = aggByMonth.get(k) || { pnl: 0, r: 0 };
-      cur.pnl += t.totalPnl || 0;
-      cur.r += t.totalR || 0;
-      aggByMonth.set(k, cur);
-    }
-    const monthlyPnlR = [...aggByMonth.keys()].sort().map((k) => ({
-      month: k,
-      pnl: aggByMonth.get(k).pnl,
-      r: aggByMonth.get(k).r,
-    }));
-
-    return { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData, riskRows, monthlyReturns, monthlyPnlR };
+    return { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData };
   }, [accounts, trades, transactions, year, accountId, strategy, indexCloses, benchSymbol]);
 
-  const { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData, riskRows, monthlyReturns, monthlyPnlR } = M;
-
-  /* ----- Monthly chart: active series + formatter per mode ----- */
-  const monthlyChart =
-    monthlyMode === 'TWR'
-      ? monthlyReturns.map((m) => ({ month: m.month, val: m.ret }))
-      : monthlyPnlR.map((m) => ({ month: m.month, val: monthlyMode === 'USD' ? m.pnl : m.r }));
-  const monthlyFmt = (v) =>
-    monthlyMode === 'TWR'
-      ? v.toFixed(2) + '%'
-      : monthlyMode === 'USD'
-        ? fmtCur(v, 'USD', currencyMode, fxRate, { compact: true })
-        : fmtR(v, 2, true);
-  const monthlyAxisFmt = (v) =>
-    monthlyMode === 'TWR'
-      ? v.toFixed(1) + '%'
-      : monthlyMode === 'USD'
-        ? (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(Math.round(v)))
-        : v.toFixed(1);
-  const monthlyLabel = monthlyMode === 'TWR' ? 'Monthly TWR' : monthlyMode === 'USD' ? 'Net P&L' : 'Total R';
+  const { port, filteredStats, instRows, cfPayoutProj, pepProj, twrChartData, benchmarkChartData } = M;
   const eurFx = fxRate;
 
   /* ----- Currency formatters bound to current mode ----- */
@@ -303,7 +235,7 @@ export default function Dashboard({ state, filters }) {
       <div className="dash-two-col">
         <div className="panel">
           <div className="dash-section-title">Breach Buffers</div>
-          {riskRows.filter((r) => r.floor != null || r.daily.limit).map(({ acc, floor, floorUpdatedBy, daily, exposure }) => {
+          {accounts.filter((a) => a.breachFloor != null).map((acc) => {
             const stats = port.accountStats[acc.id];
             if (!stats) return null;
             // Buffer measured against the account's balance high-water mark,
@@ -313,54 +245,26 @@ export default function Dashboard({ state, filters }) {
               acc.initialBalance,
               ...(stats.timeline || []).map((p) => p.balance)
             );
-            const buffer = floor != null ? Math.max(0, stats.currentBalance - floor) : null;
-            const totalBuffer = floor != null ? Math.max(0, peakBalance - floor) : null;
-            const usedPct = totalBuffer > 0 ? 1 - Math.min(1, buffer / totalBuffer) : floor != null ? 1 : 0;
+            const buffer = Math.max(0, stats.currentBalance - acc.breachFloor);
+            const totalBuffer = Math.max(0, peakBalance - acc.breachFloor);
+            const usedPct = totalBuffer > 0 ? 1 - Math.min(1, buffer / totalBuffer) : 0;
             return (
               <div key={acc.id} className="breach-row">
                 <div className="breach-info">
                   <div className="breach-name">{acc.name}</div>
-                  {floor != null && (
-                    <div className="breach-detail">
-                      {fmtCur(Math.max(0, totalBuffer - buffer), acc.currency, currencyMode, eurFx, { decimals: 0 })} / {fmtCur(totalBuffer, acc.currency, currencyMode, eurFx, { decimals: 0 })} used
-                      {floorUpdatedBy && (
-                        <span className="dim"> · floor {fmtCur(floor, acc.currency, currencyMode, eurFx, { decimals: 0 })} (set {floorUpdatedBy.date})</span>
-                      )}
-                    </div>
-                  )}
-                  {daily.limit && (
-                    <div className="breach-detail">
-                      Daily limit {fmtCur(daily.limit, acc.currency, currencyMode, eurFx, { decimals: 0 })}
-                      {daily.lastDay && (
-                        <span className={daily.lastDay.pnl <= -daily.limit ? 'neg' : daily.lastDay.pnl <= -0.8 * daily.limit ? 'neg' : 'dim'}>
-                          {' '}· last day {fmtCur(daily.lastDay.pnl, acc.currency, currencyMode, eurFx, { decimals: 0 })}
-                        </span>
-                      )}
-                      {daily.breachedDays.length > 0 && (
-                        <span className="neg"> · {daily.breachedDays.length} breached day{daily.breachedDays.length > 1 ? 's' : ''}</span>
-                      )}
-                      {daily.breachedDays.length === 0 && daily.nearDays.length > 0 && (
-                        <span> · {daily.nearDays.length} near-miss</span>
-                      )}
-                    </div>
-                  )}
-                  {exposure.openCount > 0 && (
-                    <div className="breach-detail dim">
-                      Open: {exposure.openCount} trade{exposure.openCount > 1 ? 's' : ''} · {(exposure.riskPct * 100).toFixed(2)}% at risk
-                    </div>
-                  )}
-                </div>
-                {floor != null && (
-                  <div className="breach-bar-wrapper">
-                    <ProgressBar value={Math.max(0, Math.min(1, usedPct))} warnAt={0.5} dangerAt={0.75} showPct />
+                  <div className="breach-detail">
+                    {fmtCur(Math.max(0, totalBuffer - buffer), acc.currency, 'USD', eurFx, { decimals: 0 })} / {fmtCur(totalBuffer, acc.currency, 'USD', eurFx, { decimals: 0 })} used
                   </div>
-                )}
+                </div>
+                <div className="breach-bar-wrapper">
+                  <ProgressBar value={Math.max(0, Math.min(1, usedPct))} warnAt={0.5} dangerAt={0.75} showPct />
+                </div>
               </div>
             );
           })}
-          {riskRows.filter((r) => r.floor != null || r.daily.limit).length === 0 && (
+          {accounts.filter((a) => a.breachFloor != null).length === 0 && (
             <div className="dim" style={{ padding: 'var(--space-xl) 0', textAlign: 'center' }}>
-              No accounts with breach floors or daily loss limits configured.
+              No accounts with breach floors configured.
             </div>
           )}
         </div>
@@ -381,13 +285,13 @@ export default function Dashboard({ state, filters }) {
                 </div>
                 <div>
                   <div className="balance-amount">
-                    {fmtCur(stats.currentBalance, acc.currency, currencyMode, eurFx, { decimals: 2 })}
+                    {fmtCur(stats.currentBalance, acc.currency, 'USD', eurFx, { decimals: 2 })}
                   </div>
                   <div className="balance-meta">Current</div>
                 </div>
                 <div>
                   <div className={`balance-pnl ${stats.ytdPnl > 0 ? 'pos' : stats.ytdPnl < 0 ? 'neg' : ''}`}>
-                    {stats.ytdPnl >= 0 ? '+' : ''}{fmtCur(stats.ytdPnl, acc.currency, currencyMode, eurFx, { decimals: 2 })}
+                    {stats.ytdPnl >= 0 ? '+' : ''}{fmtCur(stats.ytdPnl, acc.currency, 'USD', eurFx, { decimals: 2 })}
                   </div>
                   <div className="balance-meta">YTD PnL</div>
                 </div>
@@ -431,7 +335,7 @@ export default function Dashboard({ state, filters }) {
 
       {/* ---- MONTHLY GRID ---- */}
       <div>
-        <div className="dash-section-title">Monthly Performance · {year || new Date().getFullYear()}</div>
+        <div className="dash-section-title">Monthly Performance · {year || 'All Years'}</div>
         <MonthlyGrid
           accounts={accounts.filter((a) => a.status === 'Unlocked' || port.accountStats[a.id]?.totalTrades > 0)}
           trades={trades}
@@ -440,58 +344,6 @@ export default function Dashboard({ state, filters }) {
           strategyFilter={strategy}
         />
       </div>
-
-      {/* ---- MONTHLY RETURNS BAR CHART ---- */}
-      {(monthlyReturns.length > 0 || monthlyPnlR.length > 0) && (
-        <div className="panel">
-          <div className="flex" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-            <div className="dash-section-title">Monthly Returns · {year || 'All Years'}</div>
-            <div className="filter-chips" style={{ marginBottom: 'var(--space-md)' }}>
-              {['TWR', 'USD', 'R'].map((m) => (
-                <button
-                  key={m}
-                  className={`filter-chip ${monthlyMode === m ? 'active' : ''}`}
-                  onClick={() => setMonthlyMode(m)}
-                >
-                  {m === 'TWR' ? 'TWR %' : m}
-                </button>
-              ))}
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="month"
-                tick={{ fill: 'var(--fg-dim)', fontSize: 11 }}
-                tickLine={false}
-                axisLine={{ stroke: 'var(--border)' }}
-                tickFormatter={(m) => (year ? m.slice(5) : m)}
-              />
-              <YAxis
-                tick={{ fill: 'var(--fg-dim)', fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={monthlyAxisFmt}
-                width={60}
-              />
-              <Tooltip
-                contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border-strong)', borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: 'var(--fg)' }}
-                itemStyle={{ color: 'var(--fg)' }}
-                formatter={(v) => [monthlyFmt(v), monthlyLabel]}
-                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-              />
-              <ReferenceLine y={0} stroke="var(--fg-dim)" strokeDasharray="3 3" />
-              <Bar dataKey="val" radius={[4, 4, 0, 0]} maxBarSize={42}>
-                {monthlyChart.map((m, i) => (
-                  <Cell key={i} fill={m.val >= 0 ? 'var(--success)' : 'var(--danger)'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
       {/* ---- INSTRUMENT BREAKDOWN ---- */}
       <div className="panel">
@@ -512,10 +364,9 @@ export default function Dashboard({ state, filters }) {
         />
       </div>
 
-      {/* ---- PROJECTIONS (each panel independent) ---- */}
-      {((cfPayoutProj && cfPayoutProj.total > 0) || pepProj) && (
+      {/* ---- PAYOUT PROJECTION ---- */}
+      {cfPayoutProj && cfPayoutProj.total > 0 && (
         <div className="dash-two-col">
-          {cfPayoutProj && cfPayoutProj.total > 0 && (
           <div className="panel">
             <div className="dash-section-title">Payout Projection · Campus Fund {year || ''}</div>
             <div className="payout-component">
@@ -551,7 +402,6 @@ export default function Dashboard({ state, filters }) {
               <div className="payout-total-value">{$(cfPayoutProj.total)}</div>
             </div>
           </div>
-          )}
 
           {pepProj && (
             <div className="panel">
@@ -576,7 +426,7 @@ export default function Dashboard({ state, filters }) {
                 <div className="payout-component">
                   <div className="payout-component-label">Estimated Annual Return</div>
                   <div className={`payout-component-value ${pepProj.projectedYearEnd > pepProj.currentBalance ? 'pos' : 'neg'}`}>
-                    {fmtPct(Math.pow(1 + pepProj.avgMonthlyTwr, 12) - 1, 1, true)}
+                    {fmtPct((pepProj.projectedYearEnd / accounts.find(a => a.id === 'pepperstone').initialBalance) - 1, 1, true)}
                   </div>
                 </div>
               </div>

@@ -273,3 +273,60 @@ export function holdTimeVsR(trades, filters = {}) {
     }))
     .filter((p) => p.days >= 0);
 }
+
+/* ------------------------------------------------------------------ *
+ *  Risk management: derived breach floor, daily loss, open exposure
+ * ------------------------------------------------------------------ */
+
+/**
+ * Effective breach floor: the most recent newHardLimit transaction wins
+ * (prop firms move the floor after payouts/scale-ups); falls back to the
+ * static account.breachFloor.
+ */
+export function deriveBreachFloor(account, transactions) {
+  let floor = account.breachFloor ?? null;
+  let updatedBy = null;
+  const limits = transactions
+    .filter((t) => t.accountId === account.id && t.newHardLimit != null && t.newHardLimit !== 0)
+    .sort((a, b) => dateSort(a.date, b.date));
+  if (limits.length) {
+    const last = limits[limits.length - 1];
+    floor = last.newHardLimit;
+    updatedBy = { date: last.date, type: last.type };
+  }
+  return { floor, updatedBy };
+}
+
+/**
+ * P&L summed per close-date vs the account's daily loss limit.
+ * Close-date granularity only — trades carry no intraday timestamps,
+ * so an intraday breach that recovered before the close is invisible.
+ */
+export function dailyLossReport(account, trades, yearFilter = null) {
+  const limit = account.dailyLossLimit > 0 ? account.dailyLossLimit : null;
+  const byDay = {};
+  for (const t of trades) {
+    if (t.accountId !== account.id) continue;
+    const d = t.closeDate || t.filledDate;
+    if (!d) continue;
+    if (yearFilter && dateYear(d) !== yearFilter) continue;
+    byDay[d] = (byDay[d] || 0) + (t.totalPnl || 0);
+  }
+  const days = Object.entries(byDay)
+    .map(([date, pnl]) => ({ date, pnl }))
+    .sort((a, b) => dateSort(a.date, b.date));
+  const lastDay = days.length ? days[days.length - 1] : null;
+  let worstDay = null;
+  for (const d of days) if (!worstDay || d.pnl < worstDay.pnl) worstDay = d;
+  if (!limit) return { limit: null, days, lastDay, worstDay, breachedDays: [], nearDays: [] };
+  const breachedDays = days.filter((d) => d.pnl <= -limit);
+  const nearDays = days.filter((d) => d.pnl > -limit && d.pnl <= -0.8 * limit);
+  return { limit, days, lastDay, worstDay, breachedDays, nearDays };
+}
+
+/** Open-trade risk: how much of the account is committed to live stops. */
+export function openRiskExposure(account, trades, currentBalance) {
+  const open = trades.filter((t) => t.accountId === account.id && t.status === 'Open');
+  const riskPct = open.reduce((s, t) => s + (t.riskPct || account.riskPct || 0), 0);
+  return { openCount: open.length, riskPct, riskAmount: riskPct * (currentBalance || 0) };
+}

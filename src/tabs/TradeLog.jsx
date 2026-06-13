@@ -4,6 +4,7 @@ import MiniTable from '../components/MiniTable.jsx';
 import TradeForm from '../components/TradeForm.jsx';
 import { dateYear } from '../utils/dates.js';
 import { fmtCur, fmtR } from '../utils/currency.js';
+import { matchesStrategy } from '../analytics/account.js';
 
 export default function TradeLog({ state, setState, filters }) {
   const { accounts, trades, settings } = state;
@@ -18,8 +19,9 @@ export default function TradeLog({ state, setState, filters }) {
     const q = search.trim().toLowerCase();
     return trades
       .filter((t) => {
-        if (filters.year && dateYear(t.filledDate) !== filters.year) return false;
+        if (filters.year && dateYear(t.closeDate || t.filledDate) !== filters.year) return false;
         if (filters.accountId && t.accountId !== filters.accountId) return false;
+        if (filters.strategy && !matchesStrategy(t.timeframe, filters.strategy)) return false;
         if (q) {
           const acct = acctById[t.accountId]?.name || '';
           const hay = `${t.instrument} ${t.direction} ${t.result} ${t.tradeType} ${acct} ${t.filledDate} ${t.remarks || ''}`.toLowerCase();

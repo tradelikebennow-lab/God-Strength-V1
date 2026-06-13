@@ -65,14 +65,17 @@ export function computeMonthlyGrid(account, trades, transactions, opts = {}) {
 
   for (const ev of events) {
     if (ev.kind === 'trade') {
-      // Use FILLED date for month attribution — matches xlsx aggregation
-      const filledISO = ev.ref?.filledDate || ev.date;
-      const evYear = dateYear(filledISO);
-      const evMonth = dateMonth(filledISO);
-      // Apply factor only if it's our target year
-      if (evYear === year && bal > 0) {
-        const factor = 1 + ev.pnl / bal;
-        monthData[evMonth].twrFactor *= factor;
+      // CLOSE date decides month attribution — P&L belongs to the period
+      // it landed in (app-wide rule; previously filledDate, which dropped
+      // cross-period trades from the closing month entirely).
+      const evYear = dateYear(ev.date);
+      const evMonth = dateMonth(ev.date);
+      if (evYear === year) {
+        // Counts/P&L/R always; the balance guard only protects the
+        // TWR division (a blown account still has countable trades).
+        if (bal > 0) {
+          monthData[evMonth].twrFactor *= 1 + ev.pnl / bal;
+        }
         monthData[evMonth].pnl += ev.pnl;
         monthData[evMonth].totalR += ev.r;
         if (ev.result === 'Winner') monthData[evMonth].winners += 1;
@@ -107,7 +110,7 @@ export function computeMonthlyGrid(account, trades, transactions, opts = {}) {
       winners: md.winners,
       losers: md.losers,
     });
-    if (md.twrFactor !== 1 || md.totalR !== 0) {
+    if (md.twrFactor !== 1 || md.winners + md.losers + md.breakevens > 0) {
       ytdFactor *= md.twrFactor;
       ytdR += md.totalR;
       ytdWinners += md.winners;

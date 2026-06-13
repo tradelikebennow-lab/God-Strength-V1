@@ -12,6 +12,7 @@ import React, { useState, useMemo } from 'react';
  */
 function MiniTable({ columns, rows, defaultSort, onRowClick, maxRows, stickyHeader }) {
   const [sort, setSort] = useState(defaultSort);
+  const [showAll, setShowAll] = useState(false);
 
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -29,7 +30,8 @@ function MiniTable({ columns, rows, defaultSort, onRowClick, maxRows, stickyHead
     });
   }, [rows, sort, columns]);
 
-  const visible = maxRows ? sorted.slice(0, maxRows) : sorted;
+  const truncated = !!maxRows && !showAll && sorted.length > maxRows;
+  const visible = truncated ? sorted.slice(0, maxRows) : sorted;
 
   function handleSort(key) {
     const col = columns.find((c) => c.key === key);
@@ -96,6 +98,19 @@ function MiniTable({ columns, rows, defaultSort, onRowClick, maxRows, stickyHead
           ))}
         </tbody>
       </table>
+      {(truncated || (showAll && maxRows && sorted.length > maxRows)) && (
+        <div style={{ textAlign: 'center', padding: 'var(--space-sm)' }}>
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 'var(--text-xs, 11px)' }}
+            onClick={() => setShowAll((s) => !s)}
+          >
+            {truncated
+              ? `Showing first ${maxRows} of ${sorted.length} — Show all`
+              : `Showing all ${sorted.length} — Collapse`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

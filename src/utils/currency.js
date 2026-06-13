@@ -17,6 +17,26 @@ export function toUSD(amount, fxRate) {
   return amount * (fxRate || 1);
 }
 
+/**
+ * Convert each trade's PnL fields to USD using its account's fxRate.
+ * UI-level aggregations (sums across accounts) MUST use this first —
+ * EUR and USD PnL cannot be added raw. Trades on USD accounts pass
+ * through unchanged (same object, no copy).
+ */
+export function tradesToUSD(trades, accounts) {
+  const fxById = Object.fromEntries(accounts.map((a) => [a.id, a.currency === 'USD' ? 1 : (a.fxRate || 1)]));
+  return trades.map((t) => {
+    const fx = fxById[t.accountId] ?? 1;
+    if (fx === 1) return t;
+    return {
+      ...t,
+      totalPnl: (t.totalPnl || 0) * fx,
+      tp1Pnl: (t.tp1Pnl || 0) * fx,
+      tp2Pnl: (t.tp2Pnl || 0) * fx,
+    };
+  });
+}
+
 /** Convert USD amount to EUR using the EUR/USD rate (~1.1723 means 1 EUR = 1.1723 USD). */
 export function usdToEUR(usdAmount, eurFxRate) {
   if (!eurFxRate) return null;

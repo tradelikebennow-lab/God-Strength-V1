@@ -11,6 +11,7 @@ const EMPTY_ACCT = (i) => ({
   riskPct: 0.01,
   tierStart: null,
   breachFloor: null,
+  dailyLossLimit: null,
   status: 'Locked',
   payoutSplit: 0,
   fxRate: 1.0,
@@ -67,7 +68,8 @@ export default function Accounts({ state, setState }) {
               <Field label="Payout Split" value={acc.payoutSplit ? (acc.payoutSplit * 100).toFixed(0) + '%' : '—'} />
               <Field label="Tier Start" value={acc.tierStart ? fmtCur(acc.tierStart, acc.currency, currencyMode, eurFx, { decimals: 0 }) : '—'} />
               <Field label="Breach Floor" value={acc.breachFloor ? fmtCur(acc.breachFloor, acc.currency, currencyMode, eurFx, { decimals: 0 }) : '—'} />
-              <Field label="FX → USD" value={acc.fxRate.toFixed(4)} />
+              <Field label="Daily Loss Limit" value={acc.dailyLossLimit ? fmtCur(acc.dailyLossLimit, acc.currency, currencyMode, eurFx, { decimals: 0 }) : '—'} />
+              <Field label="FX → USD" value={(acc.fxRate ?? 1).toFixed(4)} />
               <Field label="Account ID" value={acc.id} mono />
             </div>
           </div>
@@ -133,6 +135,10 @@ function AccountModal({ account, onSave, onCancel }) {
             <div className="form-field">
               <label className="form-label">Breach Floor (optional)</label>
               <input type="number" step="any" value={form.breachFloor || ''} onChange={(e) => setField('breachFloor', parseFloat(e.target.value) || null)} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Daily Loss Limit (optional)</label>
+              <input type="number" step="any" value={form.dailyLossLimit || ''} onChange={(e) => setField('dailyLossLimit', parseFloat(e.target.value) || null)} />
             </div>
             <div className="form-field">
               <label className="form-label">Status</label>
