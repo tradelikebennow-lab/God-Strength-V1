@@ -178,6 +178,18 @@ export async function replaceJournal(trades, transactions) {
   throwIf(error, 'replace journal');
 }
 
+/**
+ * Upsert accounts so they exist as FK targets BEFORE a restore writes trades.
+ * replaceJournal only touches trades/transactions; on a JSON restore the
+ * backup's accounts may not be in the DB yet, so seed them here first.
+ */
+export async function upsertAccounts(accounts) {
+  const rows = (accounts || []).map((a, i) => ({ ...toDb(a, ACCOUNT_MAP), sort_order: i }));
+  if (!rows.length) return;
+  const { error } = await supabase.from('accounts').upsert(rows);
+  throwIf(error, 'upsert accounts');
+}
+
 /* ----------------------------------------------------------------
  * Persist (diff-based)
  * ---------------------------------------------------------------- */

@@ -1,7 +1,8 @@
 // src/App.jsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from './data/supabaseClient.js';
-import { loadStateFromDb, persistDiff, replaceJournal } from './data/db.js';
+import { loadStateFromDb, persistDiff, replaceJournal, upsertAccounts } from './data/db.js';
+import { validateAccountRefs } from './data/validate.js';
 import { exportJSON } from './data/storage.js';
 import { dateYear } from './utils/dates.js';
 import AuthGate from './components/AuthGate.jsx';
@@ -148,14 +149,21 @@ export default function App() {
   // ImportModal awaits this, so its "done" screen means actually done.
   const handleReplace = useCallback(async (newState) => {
     const s = stateRef.current;
-    // Safety net: auto-download a JSON backup of the CURRENT journal before we
-    // wipe it, so any destructive import always leaves a recovery file behind.
-    if (s && (s.trades?.length || s.transactions?.length)) exportJSON(s);
     const next = {
       ...newState,
       accounts: s.accounts, // preserve account config
       settings: s.settings,
     };
+    // Guard: accounts are preserved (not imported), so every imported trade/tx
+    // must point at an existing account or the atomic RPC fails with an opaque
+    // FK error. Fail early with a clear message — before touching anything.
+    const missing = validateAccountRefs(next.accounts, next.trades, next.transactions);
+    if (missing.length) {
+      throw new Error(`References ${missing.length} unknown account id(s): ${missing.join(', ')}. Add the account(s) on the Accounts tab first, or fix the file.`);
+    }
+    // Safety net: auto-download a JSON backup of the CURRENT journal before we
+    // wipe it, so any destructive import always leaves a recovery file behind.
+    if (s && (s.trades?.length || s.transactions?.length)) exportJSON(s);
     await replaceJournal(next.trades, next.transactions);
     lastSavedRef.current = next;
     setState(next);
@@ -167,9 +175,21 @@ export default function App() {
   // changes ride the normal diff queue afterwards.
   const handleRestoreFull = useCallback(async (newState) => {
     const s = stateRef.current;
+    // Guard: the backup must be internally consistent — every trade/tx must
+    // reference an account present in the backup's own accounts list.
+    const missing = validateAccountRefs(newState.accounts, newState.trades, newState.transactions);
+    if (missing.length) {
+      throw new Error(`Backup references ${missing.length} account id(s) it doesn't contain: ${missing.join(', ')}. The file is inconsistent.`);
+    }
     // Auto-backup current journal before a full restore overwrites it.
     if (s && (s.trades?.length || s.transactions?.length)) exportJSON(s);
+    // Seed the backup's accounts FIRST so they exist as FK targets before the
+    // RPC inserts trades. Leaving accounts on the diff queue (which runs AFTER)
+    // would FK-fail any trade pointing at a brand-new account.
+    await upsertAccounts(newState.accounts);
     await replaceJournal(newState.trades, newState.transactions);
+    // Keep base.accounts = OLD so the diff queue still reconciles renamed/
+    // removed accounts and persists settings; the upsert above is idempotent.
     lastSavedRef.current = {
       ...newState,
       accounts: s.accounts,
