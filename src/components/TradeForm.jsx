@@ -38,12 +38,17 @@ const EMPTY_TRADE = () => ({
 export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
   const [form, setForm] = useState(() => trade || EMPTY_TRADE());
   const [errors, setErrors] = useState({});
+  // Tracks whether the user hand-edited Total PnL this session. If they did,
+  // we keep their value (real broker PnL); if not, we re-derive it from R on
+  // save so editing entry/stop can't leave a stale dollar figure behind.
+  const [pnlTouched, setPnlTouched] = useState(false);
 
   // Sync incoming trade prop
   useEffect(() => {
     if (open) {
       setForm(trade || EMPTY_TRADE());
       setErrors({});
+      setPnlTouched(false);
     }
   }, [open, trade]);
 
@@ -74,6 +79,16 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
     if (!form.stop) e.stop = 'Required';
     if (!form.tp1) e.tp1 = 'Required'; // R/result are garbage without it
     if (!form.filledDate) e.filledDate = 'Required';
+    // Sanity checks — these silently produce 0-R or garbage analytics otherwise.
+    if (form.entry && form.stop && Number(form.entry) === Number(form.stop)) {
+      e.stop = 'Stop must differ from entry';
+    }
+    if (form.filledDate && form.closeDate && form.closeDate < form.filledDate) {
+      e.closeDate = 'Close date is before filled date';
+    }
+    if (!(form.riskPct > 0 && form.riskPct <= 1)) {
+      e.riskPct = 'Risk % must be between 0 and 1 (e.g. 0.005 = 0.5%)';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -89,8 +104,10 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
       market: form.market || detectMarket(form.instrument),
     });
     if (!final.id) final.id = `t-${Date.now()}`;
-    // Estimate PnL roughly from R-multiple × risk if not provided
-    if (!final.totalPnl && final.riskPct) {
+    // Derive PnL from R × risk × balance unless the user hand-entered it.
+    // Re-deriving on every save (not just when blank) keeps dollar analytics
+    // in sync after an entry/stop edit changes totalR.
+    if (!pnlTouched && final.riskPct) {
       const acct = accounts.find((a) => a.id === final.accountId);
       if (acct) final.totalPnl = final.totalR * (acct.initialBalance * final.riskPct);
     }
@@ -138,7 +155,7 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
                   {TIMEFRAMES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </Field>
-              <Field label="Risk %">
+              <Field label="Risk %" error={errors.riskPct}>
                 <input type="number" step="0.0001" value={form.riskPct} onChange={(e) => setField('riskPct', parseFloat(e.target.value) || 0)} />
               </Field>
             </div>
@@ -153,7 +170,7 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
               <Field label="TP1 Date">
                 <input type="date" value={form.tp1Date || ''} onChange={(e) => setField('tp1Date', e.target.value || null)} />
               </Field>
-              <Field label="Close Date">
+              <Field label="Close Date" error={errors.closeDate}>
                 <input type="date" value={form.closeDate} onChange={(e) => setField('closeDate', e.target.value)} />
               </Field>
             </div>
@@ -175,7 +192,7 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
                 <input type="number" step="any" value={form.exitPrice || ''} onChange={(e) => setField('exitPrice', parseFloat(e.target.value) || 0)} />
               </Field>
               <Field label="Total PnL">
-                <input type="number" step="any" value={form.totalPnl || ''} onChange={(e) => setField('totalPnl', parseFloat(e.target.value) || 0)} />
+                <input type="number" step="any" value={form.totalPnl || ''} onChange={(e) => { setPnlTouched(true); setField('totalPnl', parseFloat(e.target.value) || 0); }} />
               </Field>
             </div>
           </div>

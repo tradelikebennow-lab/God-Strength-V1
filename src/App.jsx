@@ -148,6 +148,9 @@ export default function App() {
   // ImportModal awaits this, so its "done" screen means actually done.
   const handleReplace = useCallback(async (newState) => {
     const s = stateRef.current;
+    // Safety net: auto-download a JSON backup of the CURRENT journal before we
+    // wipe it, so any destructive import always leaves a recovery file behind.
+    if (s && (s.trades?.length || s.transactions?.length)) exportJSON(s);
     const next = {
       ...newState,
       accounts: s.accounts, // preserve account config
@@ -164,6 +167,8 @@ export default function App() {
   // changes ride the normal diff queue afterwards.
   const handleRestoreFull = useCallback(async (newState) => {
     const s = stateRef.current;
+    // Auto-backup current journal before a full restore overwrites it.
+    if (s && (s.trades?.length || s.transactions?.length)) exportJSON(s);
     await replaceJournal(newState.trades, newState.transactions);
     lastSavedRef.current = {
       ...newState,

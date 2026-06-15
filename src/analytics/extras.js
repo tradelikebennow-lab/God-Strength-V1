@@ -51,7 +51,10 @@ export function marketZoneSizes(trades, filters = {}) {
 
 export function concurrentTrades(trades, filters = {}) {
   const filtered = trades.filter((t) => {
-    if (filters.year && dateYear(t.filledDate) !== filters.year) return false;
+    // Period attribution uses closeDate||filledDate app-wide; keep it consistent
+    // here so a trade filled Dec / closed Jan lands in the same year bucket as
+    // every other module (rDistribution, dayOfWeekStats, marketZoneSizes…).
+    if (filters.year && dateYear(t.closeDate || t.filledDate) !== filters.year) return false;
     return true;
   });
   if (!filtered.length) return { max: 0, avg: 0 };

@@ -202,7 +202,7 @@ export function computeWeightedR(accounts, trades) {
   for (const t of trades) {
     const acc = acctById[t.accountId];
     if (!acc) continue;
-    const baseRisk = acc.riskPct || 1;
+    const baseRisk = acc.riskPct || 0.01; // 1% default, matches account.js / discipline.js
     const tradeRisk = t.riskPct || baseRisk;
     weighted += (t.totalR || 0) * (tradeRisk / baseRisk);
   }

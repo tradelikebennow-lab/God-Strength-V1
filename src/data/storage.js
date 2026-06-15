@@ -1,42 +1,7 @@
 // src/data/storage.js
+// Persistence moved to Supabase (see data/db.js). This file now only holds the
+// JSON backup/restore helpers; the old localStorage load/save/clear were removed.
 import { SCHEMA_VERSION } from './schema.js';
-import { makeDefaultState } from './defaults.js';
-
-const STORAGE_KEY = 'god-strength-v1';
-
-/** Load app state from localStorage. If absent, write defaults and return them. */
-export function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const defaults = makeDefaultState();
-      saveState(defaults);
-      return defaults;
-    }
-    const parsed = JSON.parse(raw);
-    return migrateIfNeeded(parsed);
-  } catch (err) {
-    console.error('[storage] loadState failed, falling back to defaults', err);
-    return makeDefaultState();
-  }
-}
-
-/** Persist app state to localStorage. */
-export function saveState(state) {
-  try {
-    const toSave = { ...state, updatedAt: new Date().toISOString() };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-    return true;
-  } catch (err) {
-    console.error('[storage] saveState failed', err);
-    return false;
-  }
-}
-
-/** Wipe stored state. Used by Replace All import. */
-export function clearState() {
-  localStorage.removeItem(STORAGE_KEY);
-}
 
 /** Trigger a JSON download of current state. */
 export function exportJSON(state) {

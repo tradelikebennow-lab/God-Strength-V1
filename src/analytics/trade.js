@@ -111,33 +111,3 @@ export function enrichTrade(trade) {
     nonBreakeven: result === 'Breakeven' ? 0 : 1,
   };
 }
-
-/* ------------------------------------------------------------------ *
- *  Streak counter — populated AFTER all trades are sorted
- * ------------------------------------------------------------------ */
-
-/**
- * Walk trades sorted by close date; assign streak counter per account.
- * Streak = consecutive trades with same is-Winner flag.
- */
-export function applyStreaks(trades) {
-  const byAcct = {};
-  // Sort by closeDate, then filledDate
-  const sorted = [...trades].sort((a, b) => {
-    const cmp = String(a.closeDate || '').localeCompare(String(b.closeDate || ''));
-    return cmp !== 0 ? cmp : String(a.filledDate || '').localeCompare(String(b.filledDate || ''));
-  });
-  for (const t of sorted) {
-    const acct = t.accountId;
-    if (!byAcct[acct]) byAcct[acct] = { lastWinner: null, count: 0 };
-    const state = byAcct[acct];
-    if (state.lastWinner === t.isWinner) {
-      state.count += 1;
-    } else {
-      state.count = 1;
-      state.lastWinner = t.isWinner;
-    }
-    t.streak = state.count;
-  }
-  return sorted;
-}
