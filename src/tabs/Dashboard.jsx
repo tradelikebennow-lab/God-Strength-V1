@@ -1,6 +1,7 @@
 // src/tabs/Dashboard.jsx
 import React, { useMemo } from 'react';
 import StatCard from '../components/StatCard.jsx';
+import CountUp from '../components/CountUp.jsx';
 import MiniTable from '../components/MiniTable.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 import EquityChart from '../components/EquityChart.jsx';
@@ -204,12 +205,12 @@ export default function Dashboard({ state, filters }) {
   const wlLossPct = (Math.abs(filteredStats.avgLoss) / wlMax) * 100;
 
   return (
-    <div className="dashboard-grid animate-in">
+    <div className="dashboard-grid">
       {/* ---- HERO ROW: Portfolio + KPIs ---- */}
       <div className="dash-hero-row">
         <div className="hero-card">
           <div className="hero-label">Total Portfolio Value</div>
-          <div className="hero-value">{$(port.portfolioValue)}</div>
+          <CountUp as="div" className="hero-value" value={port.portfolioValue} format={(v) => $(v)} />
           <div className="hero-secondary">
             <span className={port.ytdGrowthUsd > 0 ? 'pos' : port.ytdGrowthUsd < 0 ? 'neg' : ''}>
               {port.ytdGrowthUsd > 0 ? '▲' : '▼'} {fmtCur(Math.abs(port.ytdGrowthUsd), 'USD', currencyMode, eurFx)}{' '}

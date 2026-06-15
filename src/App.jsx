@@ -1,5 +1,6 @@
 // src/App.jsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { supabase } from './data/supabaseClient.js';
 import { loadStateFromDb, persistDiff, replaceJournal, upsertAccounts } from './data/db.js';
 import { validateAccountRefs } from './data/validate.js';
@@ -234,6 +235,7 @@ export default function App() {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="app-shell">
       <TopBar
         activeTab={activeTab}
@@ -255,13 +257,23 @@ export default function App() {
         onRetrySave={handleRetrySave}
       />
 
-      <main className="app-main animate-in">
-        {activeTab === 'dashboard' && <Dashboard state={state} filters={filters} />}
-        {activeTab === 'in-depth' && <InDepth state={state} filters={filters} />}
-        {activeTab === 'trade-log' && <TradeLog state={state} setState={setState} filters={filters} />}
-        {activeTab === 'transactions' && <Transactions state={state} setState={setState} />}
-        {activeTab === 'accounts' && <Accounts state={state} setState={setState} />}
-        {activeTab === 'rule-book' && <RuleBook />}
+      <main className="app-main">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
+          >
+            {activeTab === 'dashboard' && <Dashboard state={state} filters={filters} />}
+            {activeTab === 'in-depth' && <InDepth state={state} filters={filters} />}
+            {activeTab === 'trade-log' && <TradeLog state={state} setState={setState} filters={filters} />}
+            {activeTab === 'transactions' && <Transactions state={state} setState={setState} />}
+            {activeTab === 'accounts' && <Accounts state={state} setState={setState} />}
+            {activeTab === 'rule-book' && <RuleBook />}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       <ImportModal
@@ -272,5 +284,6 @@ export default function App() {
         onRestoreFull={handleRestoreFull}
       />
     </div>
+    </MotionConfig>
   );
 }

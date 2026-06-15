@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>God Strength V1 — Cobalt × Nexus preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   COBALT × NEXUS — premium fintech, Nexus craft (preview)
+   ============================================================ */
+:root{
+  --bg-0:#0a0f1e; --bg-1:#0f1629; --bg-2:#161f38; --panel:#111a30;
+  --primary:#5b78ff; --primary-2:#8a6dff;
+  --success:#2fd673; --danger:#ff5470; --warning:#ffb547;
+  --fg:#eef1fb; --fg-muted:#b4bcd8; --fg-dim:#7782a6;
+  --border:rgba(123,142,220,.14); --border-strong:rgba(123,142,220,.26);
+  --grad:linear-gradient(135deg,#4361ff,#8a6dff);
+  /* Nexus typography */
+  --display:'Space Grotesk',system-ui,sans-serif;
+  --num:'IBM Plex Mono',monospace;
+  --r-sm:8px; --r-md:10px; --r-lg:12px; --r-xl:14px;
+  --shadow:0 1px 0 rgba(160,180,255,.06) inset, 0 18px 40px -20px rgba(0,0,0,.7);
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--display); color:var(--fg);
+  background:
+    radial-gradient(ellipse 90% 55% at 12% -10%, rgba(67,97,255,.18), transparent),
+    radial-gradient(ellipse 70% 50% at 100% 110%, rgba(138,109,255,.10), transparent),
+    var(--bg-0);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased; letter-spacing:-.01em;
+}
+
+/* preview chrome */
+.previewbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:14px;padding:11px 24px;background:rgba(10,15,30,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);}
+.previewbar .tag{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--primary);}
+.previewbar .ttl{font-size:13px;color:var(--fg-muted);}
+.previewbar .right{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.pbtn{font-family:var(--display);cursor:pointer;border:1px solid var(--border-strong);background:var(--bg-2);color:var(--fg);font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;display:inline-flex;gap:7px;align-items:center;transition:all .2s var(--ease);}
+.pbtn:hover{border-color:var(--primary);box-shadow:0 0 0 3px rgba(91,120,255,.18);}
+.pbtn.on{border-color:var(--primary);color:#fff;background:linear-gradient(135deg,rgba(67,97,255,.5),rgba(138,109,255,.4));}
+
+.wrap{max-width:1280px;margin:0 auto;padding:28px;}
+
+/* topbar */
+.topbar{display:flex;align-items:center;gap:22px;padding:12px 18px;margin-bottom:22px;border-radius:var(--r-lg);background:var(--panel);border:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:16px;letter-spacing:-.03em;}
+.brand-mark{width:32px;height:32px;border-radius:var(--r-md);background:var(--grad);display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;box-shadow:0 0 26px rgba(91,120,255,.5);}
+.brand .ver{font-family:var(--num);font-size:10px;color:var(--fg-dim);padding:2px 6px;background:var(--bg-2);border-radius:5px;font-weight:600;}
+.tabs{display:flex;gap:2px;flex:1;position:relative;}
+.tab{position:relative;padding:8px 15px;border-radius:999px;font-size:13px;font-weight:500;color:var(--fg-dim);cursor:pointer;transition:color .2s var(--ease);z-index:1;background:none;border:none;font-family:var(--display);letter-spacing:-.01em;}
+.tab:hover{color:var(--fg-muted);}
+.tab.active{color:#fff;}
+.tabpill{position:absolute;top:0;height:100%;border-radius:999px;background:var(--grad);box-shadow:0 4px 16px rgba(91,120,255,.4);transition:left .35s var(--ease),width .35s var(--ease);z-index:0;}
+.seg2{display:inline-flex;padding:2px;background:var(--bg-2);border-radius:var(--r-md);border:1px solid var(--border);}
+.seg2 button{font-family:var(--num);font-size:11px;font-weight:600;padding:4px 11px;border:none;background:transparent;color:var(--fg-dim);border-radius:7px;cursor:pointer;transition:all .2s var(--ease);}
+.seg2 button.active{background:var(--grad);color:#fff;}
+
+/* reveal primitive (GSAP-style: y + stagger, power3.out ≈ easeOutCubic) */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s var(--ease),transform .6s var(--ease);}
+.reveal.in{opacity:1;transform:none;}
+
+/* hero with Nexus gradient-border-shell */
+.hero-row{display:grid;grid-template-columns:1.55fr 1fr;gap:18px;margin-bottom:18px;}
+.shell{padding:1.5px;border-radius:calc(var(--r-xl) + 2px);background:linear-gradient(to right bottom, rgba(91,120,255,.5), rgba(138,109,255,.22), rgba(244,241,232,.04));box-shadow:var(--shadow);}
+.hero{position:relative;overflow:hidden;border-radius:var(--r-xl);padding:28px;background:linear-gradient(150deg,#16213f 0%,#0f1629 60%);display:flex;flex-direction:column;min-height:280px;}
+.hero-webgl{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.9;}
+.hero-fallback{position:absolute;inset:0;z-index:0;background-image:linear-gradient(rgba(91,120,255,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(91,120,255,.10) 1px,transparent 1px);background-size:34px 34px;transform:perspective(420px) rotateX(58deg) scale(1.6) translateY(28%);transform-origin:center bottom;opacity:.5;mask-image:linear-gradient(to top,#000,transparent 78%);-webkit-mask-image:linear-gradient(to top,#000,transparent 78%);}
+.hero-overlay{position:absolute;inset:0;z-index:1;background:linear-gradient(150deg,rgba(22,33,63,.55) 0%,rgba(15,22,41,.78) 55%),radial-gradient(ellipse at top right,rgba(91,120,255,.20),transparent);pointer-events:none;}
+.hero.no-webgl .hero-webgl{display:none;}
+.hero.no-webgl .hero-fallback{display:none;}
+.hero > .accentbar,.hero > .eyebrow,.hero > .hero-value,.hero > .hero-sub,.hero > .hero-kpis{position:relative;z-index:2;}
+.accentbar{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad);z-index:2;}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-muted);}
+.hero-value{font-family:var(--display);font-size:66px;font-weight:300;line-height:1.0;letter-spacing:-.05em;margin-top:10px;background:linear-gradient(135deg,#fff 26%,#aebbff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.hero-sub{font-family:var(--num);font-size:15px;color:var(--fg-muted);font-weight:500;margin-top:10px;}
+.hero-sub .pos{color:var(--success);font-weight:600;}
+.hero-kpis{margin-top:auto;padding-top:24px;display:flex;gap:30px;flex-wrap:wrap;}
+.hk-label{font-size:10px;color:var(--fg-dim);letter-spacing:.12em;text-transform:uppercase;}
+.hk-value{font-family:var(--num);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:5px;}
+
+/* panel */
+.panel{border-radius:var(--r-xl);padding:20px;background:linear-gradient(180deg,#111a30,#0f1629);border:1px solid var(--border);box-shadow:var(--shadow);}
+.card-hover{transition:transform .25s var(--ease),border-color .25s var(--ease),box-shadow .25s var(--ease);}
+.card-hover:hover{transform:translateY(-3px);border-color:var(--border-strong);box-shadow:0 1px 0 rgba(160,180,255,.08) inset,0 26px 50px -22px rgba(0,0,0,.85);}
+.panel-title{font-family:var(--display);font-size:15px;font-weight:600;color:var(--fg);letter-spacing:-.02em;margin:0 0 16px;}
+
+.creature-wrap{display:flex;align-items:center;gap:18px;}
+.orb{width:76px;height:76px;border-radius:50%;flex:none;background:radial-gradient(circle at 38% 32%,#7ee2a1,#30d158 55%,#1a7a36);box-shadow:0 0 34px rgba(48,209,88,.45);animation:bob 2s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+.creature-state{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.02em;}
+.creature-score{color:var(--fg-dim);font-size:13px;margin-top:2px;font-family:var(--num);}
+.disc-rules{margin-top:16px;display:grid;gap:9px;}
+.disc-rule{display:flex;justify-content:space-between;font-size:13px;color:var(--fg-muted);}
+.disc-rule b{font-family:var(--num);color:var(--fg);font-variant-numeric:tabular-nums;font-weight:500;}
+
+/* kpi strip — tighter Nexus grid (1px hairline gaps via bg) */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px;}
+.kpi{border-radius:var(--r-lg);padding:16px;background:linear-gradient(180deg,#111a30,#0f1629);border:1px solid var(--border);}
+.kpi .l{font-size:10px;color:var(--fg-dim);letter-spacing:.1em;text-transform:uppercase;}
+.kpi .v{font-family:var(--num);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:8px;}
+.kpi .d{font-family:var(--num);font-size:12px;margin-top:3px;}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+
+.brow{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+.brow:last-child{border-bottom:none;}
+.bname{font-size:13px;font-weight:600;}
+.bmeta{font-family:var(--num);font-size:11px;color:var(--fg-dim);margin-top:2px;}
+.btrack{width:150px;height:7px;background:var(--bg-2);border-radius:999px;overflow:hidden;margin-left:16px;}
+.bfill{height:100%;border-radius:999px;width:0;transition:width 1.1s var(--ease);}
+.bfill.ok{background:var(--success);}.bfill.warn{background:var(--warning);}.bfill.bad{background:var(--danger);}
+
+.chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--fg-dim);font-family:var(--num);}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+
+.mtable{width:100%;border-collapse:collapse;font-size:12px;}
+.mtable th,.mtable td{padding:8px 9px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;}
+.mtable th{font-size:10px;color:var(--fg-dim);text-transform:uppercase;letter-spacing:.09em;font-weight:600;font-family:var(--display);}
+.mtable td:first-child,.mtable th:first-child{text-align:left;}
+.mtable td:first-child{font-family:var(--display);font-weight:500;}
+.mtable .num{font-family:var(--num);font-variant-numeric:tabular-nums;}
+.mtable .ytd{background:rgba(91,120,255,.16);font-weight:600;}
+
+.pcomp{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--fg-muted);}
+.pcomp b{font-family:var(--num);color:var(--fg);font-weight:500;font-variant-numeric:tabular-nums;}
+.ptotal{margin-top:12px;padding-top:12px;border-top:2px solid var(--primary);display:flex;justify-content:space-between;align-items:baseline;}
+.ptotal .pl{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
+.ptotal .pv{font-family:var(--num);font-size:21px;font-weight:700;color:var(--primary);font-variant-numeric:tabular-nums;}
+
+.pos{color:var(--success);}.neg{color:var(--danger);}.dim{color:var(--fg-dim);}
+
+@media (max-width:980px){
+  .hero-row,.two,.grid3{grid-template-columns:1fr;}
+  .kpis{grid-template-columns:repeat(3,1fr);}
+  .hero-value{font-size:50px;}
+}
+@media (prefers-reduced-motion: reduce){
+  .reveal{opacity:1;transform:none;transition:none;}
+  .orb,.bfill{animation:none;transition:none;}
+}
+</style>
+</head>
+<body>
+<div class="previewbar">
+  <span class="tag">Cobalt × Nexus</span>
+  <span class="ttl">Preview only · Space Grotesk + IBM Plex Mono · gradient-shell hero · WebGL grid. Nothing in your app changed.</span>
+  <div class="right">
+    <button class="pbtn on" id="webglToggle">◧ WebGL grid: On</button>
+    <button class="pbtn" id="replay">↻ Replay motion</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="topbar reveal">
+    <div class="brand"><span class="brand-mark">GS</span> God Strength <span class="ver">v1</span></div>
+    <div class="tabs" id="tabs">
+      <span class="tabpill" id="tabpill"></span>
+      <button class="tab active">Dashboard</button>
+      <button class="tab">In Depth</button>
+      <button class="tab">Trade Log</button>
+      <button class="tab">Transactions</button>
+      <button class="tab">Accounts</button>
+      <button class="tab">Rule Book</button>
+    </div>
+    <div class="seg2"><button class="active">USD</button><button>EUR</button><button>BOTH</button></div>
+  </div>
+
+  <div class="hero-row">
+    <div class="shell reveal">
+      <div class="hero" id="hero">
+        <canvas class="hero-webgl" id="heroCanvas"></canvas>
+        <div class="hero-fallback"></div>
+        <div class="hero-overlay"></div>
+        <span class="accentbar"></span>
+        <div class="eyebrow">Portfolio value · USD</div>
+        <div class="hero-value" data-count="128540" data-prefix="$">$0</div>
+        <div class="hero-sub"><span class="pos" data-count="24.3" data-prefix="+" data-suffix="%" data-dec="1">+0%</span> YTD &nbsp;·&nbsp; +$25,140 realized</div>
+        <div class="hero-kpis">
+          <div><div class="hk-label">Win rate (ex-BE)</div><div class="hk-value" data-count="58.4" data-suffix="%" data-dec="1">0%</div></div>
+          <div><div class="hk-label">Profit factor</div><div class="hk-value" data-count="2.14" data-dec="2">0</div></div>
+          <div><div class="hk-label">Expectancy</div><div class="hk-value pos" data-count="0.42" data-prefix="+" data-suffix="R" data-dec="2">0R</div></div>
+          <div><div class="hk-label">Max DD</div><div class="hk-value neg" data-count="-8.7" data-suffix="%" data-dec="1">0%</div></div>
+          <div><div class="hk-label">Calmar</div><div class="hk-value" data-count="2.81" data-dec="2">0</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Discipline</h3>
+      <div class="creature-wrap">
+        <div class="orb"></div>
+        <div><div class="creature-state">Thriving</div><div class="creature-score">Discipline score · <span data-count="86" data-dec="0">0</span> / 100</div></div>
+      </div>
+      <div class="disc-rules">
+        <div class="disc-rule"><span>Risk per trade ≤ 1%</span><b>0.6%</b></div>
+        <div class="disc-rule"><span>Stop honoured</span><b>97%</b></div>
+        <div class="disc-rule"><span>Daily loss limit</span><b class="pos">OK</b></div>
+        <div class="disc-rule"><span>Overtrading guard</span><b>2.1 / day</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis">
+    <div class="kpi reveal card-hover"><div class="l">Total trades</div><div class="v" data-count="142" data-dec="0">0</div><div class="d dim">97 ex-BE</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Net PnL</div><div class="v pos" data-count="25140" data-prefix="+$">+$0</div><div class="d pos">+24.3%</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Avg win</div><div class="v" data-count="612" data-prefix="$">$0</div><div class="d dim">+1.9R</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Avg loss</div><div class="v neg" data-count="-286" data-prefix="$">$0</div><div class="d dim">−0.9R</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Largest win</div><div class="v" data-count="2840" data-prefix="$">$0</div><div class="d dim">EURUSD</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Best month</div><div class="v pos" data-count="6.8" data-prefix="+" data-suffix="%" data-dec="1">+0%</div><div class="d dim">March</div></div>
+  </div>
+
+  <div class="two">
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Breach buffers</h3>
+      <div class="brow"><div><div class="bname">FTMO 200K</div><div class="bmeta">$11,420 to floor · 5.7% buffer</div></div><div class="btrack"><div class="bfill ok" data-w="72"></div></div></div>
+      <div class="brow"><div><div class="bname">Campus Fund 100K</div><div class="bmeta">$3,180 to floor · 3.2% buffer</div></div><div class="btrack"><div class="bfill warn" data-w="38"></div></div></div>
+      <div class="brow"><div><div class="bname">Pepperstone (EUR)</div><div class="bmeta">€18,900 to floor · 14.1% buffer</div></div><div class="btrack"><div class="bfill ok" data-w="88"></div></div></div>
+      <div class="brow"><div><div class="bname">FundedNext 50K</div><div class="bmeta">$1,040 to floor · 2.1% buffer</div></div><div class="btrack"><div class="bfill bad" data-w="18"></div></div></div>
+    </div>
+
+    <div class="panel reveal card-hover">
+      <div class="chart-head">
+        <h3 class="panel-title" style="margin:0;">Equity curve · TWR</h3>
+        <div class="legend"><span><i style="background:var(--primary)"></i>Portfolio</span><span><i style="background:var(--fg-dim)"></i>S&amp;P 500</span></div>
+      </div>
+      <svg viewBox="0 0 520 200" width="100%" height="190" preserveAspectRatio="none" style="display:block;">
+        <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--primary)" stop-opacity="0.3"/><stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/></linearGradient></defs>
+        <line x1="0" y1="50" x2="520" y2="50" stroke="var(--border)" stroke-width="1"/>
+        <line x1="0" y1="100" x2="520" y2="100" stroke="var(--border)" stroke-width="1"/>
+        <line x1="0" y1="150" x2="520" y2="150" stroke="var(--border)" stroke-width="1"/>
+        <path id="fillpath" d="M0,170 L60,158 L120,150 L180,128 L240,132 L300,96 L360,84 L420,52 L480,40 L520,28 L520,200 L0,200 Z" fill="url(#fill)" opacity="0"/>
+        <path d="M0,178 L60,172 L120,168 L180,160 L240,162 L300,150 L360,146 L420,134 L480,128 L520,120" fill="none" stroke="var(--fg-dim)" stroke-width="2" stroke-dasharray="4 4"/>
+        <path id="eqline" d="M0,170 L60,158 L120,150 L180,128 L240,132 L300,96 L360,84 L420,52 L480,40 L520,28" fill="none" stroke="var(--primary)" stroke-width="2.5"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Monthly · TWR %</h3>
+      <table class="mtable">
+        <thead><tr><th>Account</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th class="ytd">YTD</th></tr></thead>
+        <tbody>
+          <tr><td>FTMO 200K</td><td class="num pos">+2.1</td><td class="num pos">+3.4</td><td class="num pos">+6.8</td><td class="num neg">−1.2</td><td class="num pos">+4.0</td><td class="num ytd pos">+15.8</td></tr>
+          <tr><td>Campus Fund</td><td class="num pos">+1.4</td><td class="num neg">−0.8</td><td class="num pos">+3.1</td><td class="num pos">+2.2</td><td class="num pos">+1.9</td><td class="num ytd pos">+8.1</td></tr>
+          <tr><td>Pepperstone</td><td class="num pos">+3.0</td><td class="num pos">+2.6</td><td class="num pos">+4.4</td><td class="num pos">+1.1</td><td class="num pos">+3.3</td><td class="num ytd pos">+15.1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Payout projection · Campus Fund</h3>
+      <div class="pcomp"><span>Net banked (YTD)</span><b data-count="4102" data-prefix="$">$0</b></div>
+      <div class="pcomp"><span>Avg monthly gross</span><b data-count="1793" data-prefix="$">$0</b></div>
+      <div class="pcomp"><span>Future split share</span><b>80%</b></div>
+      <div class="pcomp"><span>Projected future net</span><b data-count="8605" data-prefix="$">$0</b></div>
+      <div class="ptotal"><span class="pl">Projected 2026 total</span><span class="pv" data-count="12707" data-prefix="$">$0</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fmt = (n, dec) => Number(n).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+
+function countUp(el){
+  const target = parseFloat(el.dataset.count);
+  const dec = parseInt(el.dataset.dec || '0', 10);
+  const pre = el.dataset.prefix || '', suf = el.dataset.suffix || '';
+  if (reduce){ el.textContent = pre + fmt(target, dec) + suf; return; }
+  const dur = 1100, start = performance.now();
+  function tick(now){
+    const t = Math.min(1, (now - start)/dur), eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = pre + fmt(target*eased, dec) + suf;
+    if (t < 1) requestAnimationFrame(tick); else el.textContent = pre + fmt(target, dec) + suf;
+  }
+  requestAnimationFrame(tick);
+}
+function drawEquity(){
+  const line=document.getElementById('eqline'), fill=document.getElementById('fillpath'), len=line.getTotalLength();
+  if (reduce){ fill.style.opacity=1; return; }
+  line.style.transition='none'; line.style.strokeDasharray=len; line.style.strokeDashoffset=len;
+  fill.style.transition='opacity .6s ease'; fill.style.opacity=0;
+  requestAnimationFrame(()=>{ line.style.transition='stroke-dashoffset 1.4s cubic-bezier(.22,.61,.36,1)'; line.style.strokeDashoffset=0; setTimeout(()=>fill.style.opacity=1,500); });
+}
+function fillBars(){ document.querySelectorAll('.bfill').forEach(b=> b.style.width=(b.dataset.w||0)+'%'); }
+
+function runMotion(){
+  const items=[...document.querySelectorAll('.reveal')];
+  items.forEach(el=>el.classList.remove('in'));
+  void document.body.offsetWidth;
+  items.forEach((el,i)=> setTimeout(()=>el.classList.add('in'), reduce?0:i*70));
+  setTimeout(()=>{ document.querySelectorAll('[data-count]').forEach(countUp); drawEquity(); fillBars(); }, reduce?0:250);
+}
+
+/* tab pill */
+function setPill(btn){ const p=document.getElementById('tabpill'); p.style.left=btn.offsetLeft+'px'; p.style.width=btn.offsetWidth+'px'; }
+document.querySelectorAll('.tab').forEach(t=> t.addEventListener('click', ()=>{
+  document.querySelector('.tab.active')?.classList.remove('active'); t.classList.add('active'); setPill(t);
+  const wrap=document.querySelector('.wrap');
+  if(!reduce){ wrap.style.transition='none'; wrap.style.opacity='0'; wrap.style.transform='translateY(6px)';
+    requestAnimationFrame(()=>{ wrap.style.transition='opacity .4s ease,transform .4s ease'; wrap.style.opacity='1'; wrap.style.transform='none'; }); }
+}));
+document.getElementById('replay').addEventListener('click', runMotion);
+
+/* ---- WebGL perspective grid (Three.js), Nexus-style, cobalt-recolored ---- */
+let webglRunning=false, rafId=null, renderer=null;
+function initWebGL(){
+  const canvas=document.getElementById('heroCanvas'), hero=document.getElementById('hero');
+  if(!window.THREE || reduce || !canvas){ hero.classList.add('no-webgl'); return; }
+  try{
+    renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    const scene=new THREE.Scene();
+    scene.fog=new THREE.Fog(0x0a0f1e, 5, 20);
+    const cam=new THREE.PerspectiveCamera(58,2,0.1,100); cam.position.set(0,1.5,7); cam.lookAt(0,0,-4);
+    const g1=new THREE.GridHelper(80,80,0x6d83ff,0x2e3e84); g1.material.transparent=true; g1.material.opacity=.55; g1.position.z=-4; scene.add(g1);
+    const g2=new THREE.GridHelper(80,40,0x8a6dff,0x24306b); g2.material.transparent=true; g2.material.opacity=.25; g2.position.y=-0.02; g2.position.z=-4; scene.add(g2);
+    let tx=0;
+    function resize(){ const w=hero.clientWidth,h=hero.clientHeight; renderer.setSize(w,h,false); cam.aspect=w/h; cam.updateProjectionMatrix(); }
+    resize(); window.addEventListener('resize',resize);
+    hero.addEventListener('pointermove',e=>{ const r=hero.getBoundingClientRect(); tx=((e.clientX-r.left)/r.width-0.5)*0.6; });
+    hero.addEventListener('pointerleave',()=> tx=0);
+    const t0=performance.now();
+    function loop(now){
+      const t=(now-t0)/1000;
+      g1.position.z=((t*0.6)%2)-4; g2.position.z=((t*0.6)%2)-4;          // flow toward viewer
+      const breathe=0.45+0.12*Math.sin(t*0.7);                            // breathing pulse
+      g1.material.opacity=breathe; g2.material.opacity=breathe*0.5;
+      cam.position.x += (tx - cam.position.x)*0.04;                       // pointer drift
+      cam.lookAt(0,0,-4);
+      renderer.render(scene,cam);
+      rafId=requestAnimationFrame(loop);
+    }
+    rafId=requestAnimationFrame(loop); webglRunning=true;
+  }catch(err){ hero.classList.add('no-webgl'); }
+}
+document.getElementById('webglToggle').addEventListener('click', (e)=>{
+  const hero=document.getElementById('hero'), btn=e.currentTarget;
+  const off=hero.classList.toggle('no-webgl');
+  btn.classList.toggle('on', !off);
+  btn.textContent = off ? '◧ WebGL grid: Off' : '◧ WebGL grid: On';
+});
+
+window.addEventListener('load', ()=>{ setPill(document.querySelector('.tab.active')); initWebGL(); runMotion(); });
+window.addEventListener('resize', ()=> setPill(document.querySelector('.tab.active')));
+</script>
+</body>
+</html>

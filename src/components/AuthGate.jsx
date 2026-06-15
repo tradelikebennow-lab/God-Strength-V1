@@ -5,6 +5,7 @@
 // → Email → "Allow new users to sign up" OFF, so the API path is closed too.)
 import React, { useState } from 'react';
 import { supabase } from '../data/supabaseClient.js';
+import LoginGrid from './LoginGrid.jsx';
 
 export default function AuthGate() {
   const [email, setEmail] = useState('');
@@ -29,6 +30,7 @@ export default function AuthGate() {
 
   return (
     <div className="auth-shell">
+      <LoginGrid />
       <form className="auth-card animate-in" onSubmit={handleSubmit}>
         <div className="brand" style={{ justifyContent: 'center', marginBottom: 8 }}>
           <div className="brand-mark">G</div>

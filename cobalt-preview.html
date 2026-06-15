@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>God Strength V1 — Cobalt + Motion preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   COBALT — premium fintech design system (preview)
+   ============================================================ */
+:root{
+  --bg-0:#0a0f1e; --bg-1:#0f1629; --bg-2:#161f38; --panel:#111a30;
+  --primary:#5b78ff; --primary-2:#8a6dff;
+  --success:#2fd673; --danger:#ff5470; --warning:#ffb547;
+  --fg:#eef1fb; --fg-muted:#b4bcd8; --fg-dim:#7782a6;
+  --border:rgba(123,142,220,.14); --border-strong:rgba(123,142,220,.26);
+  --grad:linear-gradient(135deg,#4361ff,#8a6dff);
+  --num:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+  --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px;
+  --shadow:0 1px 0 rgba(160,180,255,.06) inset, 0 18px 40px -20px rgba(0,0,0,.7);
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Inter',system-ui,sans-serif; color:var(--fg);
+  background:
+    radial-gradient(ellipse 90% 55% at 12% -10%, rgba(67,97,255,.18), transparent),
+    radial-gradient(ellipse 70% 50% at 100% 110%, rgba(138,109,255,.10), transparent),
+    var(--bg-0);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased; letter-spacing:-.005em;
+}
+
+/* preview chrome */
+.previewbar{
+  position:sticky; top:0; z-index:100; display:flex; align-items:center; gap:14px;
+  padding:11px 24px; background:rgba(10,15,30,.82); backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+}
+.previewbar .tag{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--primary);}
+.previewbar .ttl{font-size:13px;color:var(--fg-muted);}
+.previewbar .right{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.replay{font-family:inherit;cursor:pointer;border:1px solid var(--border-strong);background:var(--bg-2);color:var(--fg);font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;display:inline-flex;gap:7px;align-items:center;transition:all .2s var(--ease);}
+.replay:hover{border-color:var(--primary);box-shadow:0 0 0 3px rgba(91,120,255,.18);}
+
+.wrap{max-width:1280px;margin:0 auto;padding:28px;}
+
+/* topbar */
+.topbar{display:flex;align-items:center;gap:22px;padding:12px 18px;margin-bottom:24px;border-radius:var(--r-lg);background:var(--panel);border:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:15px;letter-spacing:-.02em;}
+.brand-mark{width:32px;height:32px;border-radius:var(--r-md);background:var(--grad);display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px;box-shadow:0 0 26px rgba(91,120,255,.5);}
+.brand .ver{font-family:var(--mono);font-size:10px;color:var(--fg-dim);padding:2px 6px;background:var(--bg-2);border-radius:5px;font-weight:600;}
+.tabs{display:flex;gap:2px;flex:1;position:relative;}
+.tab{position:relative;padding:8px 16px;border-radius:999px;font-size:13px;font-weight:500;color:var(--fg-dim);cursor:pointer;transition:color .2s var(--ease);z-index:1;background:none;border:none;font-family:inherit;}
+.tab:hover{color:var(--fg-muted);}
+.tab.active{color:#fff;}
+.tabpill{position:absolute;top:0;height:100%;border-radius:999px;background:var(--grad);box-shadow:0 4px 16px rgba(91,120,255,.4);transition:left .35s var(--ease),width .35s var(--ease);z-index:0;}
+.seg2{display:inline-flex;padding:2px;background:var(--bg-2);border-radius:var(--r-md);border:1px solid var(--border);}
+.seg2 button{font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 11px;border:none;background:transparent;color:var(--fg-dim);border-radius:7px;cursor:pointer;transition:all .2s var(--ease);}
+.seg2 button.active{background:var(--grad);color:#fff;}
+
+/* reveal primitive (mimics Framer Motion whileInView) */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s var(--ease),transform .6s var(--ease);}
+.reveal.in{opacity:1;transform:none;}
+
+/* hero */
+.hero-row{display:grid;grid-template-columns:1.55fr 1fr;gap:20px;margin-bottom:20px;}
+.hero{position:relative;overflow:hidden;border-radius:var(--r-xl);padding:28px;border:1px solid var(--border-strong);box-shadow:var(--shadow);background:linear-gradient(150deg,#16213f 0%,#0f1629 60%),radial-gradient(ellipse at top right,rgba(91,120,255,.24),transparent);display:flex;flex-direction:column;}
+.hero .accentbar{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad);}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--fg-dim);}
+.hero-value{font-family:var(--num);font-size:62px;font-weight:800;line-height:1.0;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-top:8px;background:linear-gradient(135deg,#fff 28%,#aebbff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.hero-sub{font-family:var(--num);font-size:18px;color:var(--fg-muted);font-weight:500;margin-top:8px;}
+.hero-sub .pos{color:var(--success);font-weight:700;}
+.hero-kpis{margin-top:auto;padding-top:24px;display:flex;gap:32px;flex-wrap:wrap;}
+.hk-label{font-size:11px;color:var(--fg-dim);letter-spacing:.1em;text-transform:uppercase;}
+.hk-value{font-family:var(--num);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:4px;}
+
+/* panel */
+.panel{border-radius:var(--r-xl);padding:20px;background:linear-gradient(180deg,#111a30,#0f1629);border:1px solid var(--border);box-shadow:var(--shadow);}
+.card-hover{transition:transform .25s var(--ease),border-color .25s var(--ease),box-shadow .25s var(--ease);}
+.card-hover:hover{transform:translateY(-3px);border-color:var(--border-strong);box-shadow:0 1px 0 rgba(160,180,255,.08) inset,0 26px 50px -22px rgba(0,0,0,.85);}
+.panel-title{font-size:16px;font-weight:600;color:var(--fg);letter-spacing:-.02em;margin:0 0 16px;}
+
+.creature-wrap{display:flex;align-items:center;gap:18px;}
+.orb{width:78px;height:78px;border-radius:50%;flex:none;background:radial-gradient(circle at 38% 32%,#7ee2a1,#30d158 55%,#1a7a36);box-shadow:0 0 34px rgba(48,209,88,.45);animation:bob 2s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+.creature-state{font-size:22px;font-weight:700;letter-spacing:-.02em;}
+.creature-score{color:var(--fg-dim);font-size:13px;margin-top:2px;}
+.disc-rules{margin-top:16px;display:grid;gap:9px;}
+.disc-rule{display:flex;justify-content:space-between;font-size:13px;color:var(--fg-muted);}
+.disc-rule b{font-family:var(--num);color:var(--fg);font-variant-numeric:tabular-nums;}
+
+/* kpi strip */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px;}
+.kpi{border-radius:var(--r-lg);padding:16px;background:linear-gradient(180deg,#111a30,#0f1629);border:1px solid var(--border);}
+.kpi .l{font-size:11px;color:var(--fg-dim);letter-spacing:.09em;text-transform:uppercase;}
+.kpi .v{font-family:var(--num);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:8px;}
+.kpi .d{font-family:var(--num);font-size:12px;margin-top:3px;}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+
+.brow{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+.brow:last-child{border-bottom:none;}
+.bname{font-size:13px;font-weight:600;}
+.bmeta{font-family:var(--mono);font-size:11px;color:var(--fg-dim);margin-top:2px;}
+.btrack{width:150px;height:7px;background:var(--bg-2);border-radius:999px;overflow:hidden;margin-left:16px;}
+.bfill{height:100%;border-radius:999px;width:0;transition:width 1.1s var(--ease);}
+.bfill.ok{background:var(--success);}.bfill.warn{background:var(--warning);}.bfill.bad{background:var(--danger);}
+
+.chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--fg-dim);}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+
+.mtable{width:100%;border-collapse:collapse;font-size:12px;}
+.mtable th,.mtable td{padding:8px 9px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;}
+.mtable th{font-size:10px;color:var(--fg-dim);text-transform:uppercase;letter-spacing:.08em;font-weight:600;}
+.mtable td:first-child,.mtable th:first-child{text-align:left;}
+.mtable .num{font-family:var(--num);font-variant-numeric:tabular-nums;}
+.mtable .ytd{background:rgba(91,120,255,.16);font-weight:700;}
+
+.pcomp{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--fg-muted);}
+.pcomp b{font-family:var(--num);color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums;}
+.ptotal{margin-top:12px;padding-top:12px;border-top:2px solid var(--primary);display:flex;justify-content:space-between;align-items:baseline;}
+.ptotal .pl{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
+.ptotal .pv{font-family:var(--num);font-size:22px;font-weight:800;color:var(--primary);font-variant-numeric:tabular-nums;}
+
+.pos{color:var(--success);}.neg{color:var(--danger);}.dim{color:var(--fg-dim);}
+
+@media (max-width:980px){
+  .hero-row,.two,.grid3{grid-template-columns:1fr;}
+  .kpis{grid-template-columns:repeat(3,1fr);}
+  .hero-value{font-size:48px;}
+}
+@media (prefers-reduced-motion: reduce){
+  .reveal{opacity:1;transform:none;transition:none;}
+  .orb,.bfill{animation:none;transition:none;}
+}
+</style>
+</head>
+<body>
+<div class="previewbar">
+  <span class="tag">Cobalt + Motion</span>
+  <span class="ttl">Preview only — vanilla JS mimics the planned Framer Motion. Nothing in your app has changed.</span>
+  <div class="right"><button class="replay" id="replay">↻ Replay motion</button></div>
+</div>
+
+<div class="wrap">
+
+  <div class="topbar reveal">
+    <div class="brand"><span class="brand-mark">GS</span> God Strength <span class="ver">v1</span></div>
+    <div class="tabs" id="tabs">
+      <span class="tabpill" id="tabpill"></span>
+      <button class="tab active">Dashboard</button>
+      <button class="tab">In Depth</button>
+      <button class="tab">Trade Log</button>
+      <button class="tab">Transactions</button>
+      <button class="tab">Accounts</button>
+      <button class="tab">Rule Book</button>
+    </div>
+    <div class="seg2"><button class="active">USD</button><button>EUR</button><button>BOTH</button></div>
+  </div>
+
+  <div class="hero-row">
+    <div class="hero reveal card-hover">
+      <span class="accentbar"></span>
+      <div class="eyebrow">Portfolio value · USD</div>
+      <div class="hero-value" data-count="128540" data-prefix="$">$0</div>
+      <div class="hero-sub"><span class="pos" data-count="24.3" data-prefix="+" data-suffix="%" data-dec="1">+0%</span> YTD &nbsp;·&nbsp; +$25,140 realized</div>
+      <div class="hero-kpis">
+        <div><div class="hk-label">Win rate (ex-BE)</div><div class="hk-value" data-count="58.4" data-suffix="%" data-dec="1">0%</div></div>
+        <div><div class="hk-label">Profit factor</div><div class="hk-value" data-count="2.14" data-dec="2">0</div></div>
+        <div><div class="hk-label">Expectancy</div><div class="hk-value pos" data-count="0.42" data-prefix="+" data-suffix="R" data-dec="2">0R</div></div>
+        <div><div class="hk-label">Max DD</div><div class="hk-value neg" data-count="-8.7" data-suffix="%" data-dec="1">0%</div></div>
+        <div><div class="hk-label">Calmar</div><div class="hk-value" data-count="2.81" data-dec="2">0</div></div>
+      </div>
+    </div>
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Discipline</h3>
+      <div class="creature-wrap">
+        <div class="orb"></div>
+        <div><div class="creature-state">Thriving</div><div class="creature-score">Discipline score · <span data-count="86" data-dec="0">0</span> / 100</div></div>
+      </div>
+      <div class="disc-rules">
+        <div class="disc-rule"><span>Risk per trade ≤ 1%</span><b>0.6%</b></div>
+        <div class="disc-rule"><span>Stop honoured</span><b>97%</b></div>
+        <div class="disc-rule"><span>Daily loss limit</span><b class="pos">OK</b></div>
+        <div class="disc-rule"><span>Overtrading guard</span><b>2.1 / day</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis">
+    <div class="kpi reveal card-hover"><div class="l">Total trades</div><div class="v" data-count="142" data-dec="0">0</div><div class="d dim">97 ex-BE</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Net PnL</div><div class="v pos" data-count="25140" data-prefix="+$">+$0</div><div class="d pos">+24.3%</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Avg win</div><div class="v" data-count="612" data-prefix="$">$0</div><div class="d dim">+1.9R</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Avg loss</div><div class="v neg" data-count="-286" data-prefix="$">$0</div><div class="d dim">−0.9R</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Largest win</div><div class="v" data-count="2840" data-prefix="$">$0</div><div class="d dim">EURUSD</div></div>
+    <div class="kpi reveal card-hover"><div class="l">Best month</div><div class="v pos" data-count="6.8" data-prefix="+" data-suffix="%" data-dec="1">+0%</div><div class="d dim">March</div></div>
+  </div>
+
+  <div class="two">
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Breach buffers</h3>
+      <div class="brow"><div><div class="bname">FTMO 200K</div><div class="bmeta">$11,420 to floor · 5.7% buffer</div></div><div class="btrack"><div class="bfill ok" data-w="72"></div></div></div>
+      <div class="brow"><div><div class="bname">Campus Fund 100K</div><div class="bmeta">$3,180 to floor · 3.2% buffer</div></div><div class="btrack"><div class="bfill warn" data-w="38"></div></div></div>
+      <div class="brow"><div><div class="bname">Pepperstone (EUR)</div><div class="bmeta">€18,900 to floor · 14.1% buffer</div></div><div class="btrack"><div class="bfill ok" data-w="88"></div></div></div>
+      <div class="brow"><div><div class="bname">FundedNext 50K</div><div class="bmeta">$1,040 to floor · 2.1% buffer</div></div><div class="btrack"><div class="bfill bad" data-w="18"></div></div></div>
+    </div>
+
+    <div class="panel reveal card-hover">
+      <div class="chart-head">
+        <h3 class="panel-title" style="margin:0;">Equity curve · TWR</h3>
+        <div class="legend"><span><i style="background:var(--primary)"></i>Portfolio</span><span><i style="background:var(--fg-dim)"></i>S&amp;P 500</span></div>
+      </div>
+      <svg viewBox="0 0 520 200" width="100%" height="190" preserveAspectRatio="none" style="display:block;">
+        <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--primary)" stop-opacity="0.3"/><stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/></linearGradient></defs>
+        <line x1="0" y1="50" x2="520" y2="50" stroke="var(--border)" stroke-width="1"/>
+        <line x1="0" y1="100" x2="520" y2="100" stroke="var(--border)" stroke-width="1"/>
+        <line x1="0" y1="150" x2="520" y2="150" stroke="var(--border)" stroke-width="1"/>
+        <path id="fillpath" d="M0,170 L60,158 L120,150 L180,128 L240,132 L300,96 L360,84 L420,52 L480,40 L520,28 L520,200 L0,200 Z" fill="url(#fill)" opacity="0"/>
+        <path d="M0,178 L60,172 L120,168 L180,160 L240,162 L300,150 L360,146 L420,134 L480,128 L520,120" fill="none" stroke="var(--fg-dim)" stroke-width="2" stroke-dasharray="4 4"/>
+        <path id="eqline" d="M0,170 L60,158 L120,150 L180,128 L240,132 L300,96 L360,84 L420,52 L480,40 L520,28" fill="none" stroke="var(--primary)" stroke-width="2.5"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Monthly · TWR %</h3>
+      <table class="mtable">
+        <thead><tr><th>Account</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th class="ytd">YTD</th></tr></thead>
+        <tbody>
+          <tr><td>FTMO 200K</td><td class="num pos">+2.1</td><td class="num pos">+3.4</td><td class="num pos">+6.8</td><td class="num neg">−1.2</td><td class="num pos">+4.0</td><td class="num ytd pos">+15.8</td></tr>
+          <tr><td>Campus Fund</td><td class="num pos">+1.4</td><td class="num neg">−0.8</td><td class="num pos">+3.1</td><td class="num pos">+2.2</td><td class="num pos">+1.9</td><td class="num ytd pos">+8.1</td></tr>
+          <tr><td>Pepperstone</td><td class="num pos">+3.0</td><td class="num pos">+2.6</td><td class="num pos">+4.4</td><td class="num pos">+1.1</td><td class="num pos">+3.3</td><td class="num ytd pos">+15.1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel reveal card-hover">
+      <h3 class="panel-title">Payout projection · Campus Fund</h3>
+      <div class="pcomp"><span>Net banked (YTD)</span><b data-count="4102" data-prefix="$">$0</b></div>
+      <div class="pcomp"><span>Avg monthly gross</span><b data-count="1793" data-prefix="$">$0</b></div>
+      <div class="pcomp"><span>Future split share</span><b>80%</b></div>
+      <div class="pcomp"><span>Projected future net</span><b data-count="8605" data-prefix="$">$0</b></div>
+      <div class="ptotal"><span class="pl">Projected 2026 total</span><span class="pv" data-count="12707" data-prefix="$">$0</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fmt = (n, dec) => Number(n).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+
+function countUp(el){
+  const target = parseFloat(el.dataset.count);
+  const dec = parseInt(el.dataset.dec || '0', 10);
+  const pre = el.dataset.prefix || '';
+  const suf = el.dataset.suffix || '';
+  if (reduce){ el.textContent = pre + fmt(target, dec) + suf; return; }
+  const dur = 1100; const start = performance.now();
+  const from = 0;
+  function tick(now){
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    const val = from + (target - from) * eased;
+    el.textContent = pre + fmt(val, dec) + suf;
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = pre + fmt(target, dec) + suf;
+  }
+  requestAnimationFrame(tick);
+}
+
+function drawEquity(){
+  const line = document.getElementById('eqline');
+  const fill = document.getElementById('fillpath');
+  const len = line.getTotalLength();
+  if (reduce){ fill.style.opacity = 1; return; }
+  line.style.transition='none';
+  line.style.strokeDasharray = len; line.style.strokeDashoffset = len;
+  fill.style.transition='opacity .6s ease'; fill.style.opacity = 0;
+  requestAnimationFrame(()=>{
+    line.style.transition = 'stroke-dashoffset 1.4s cubic-bezier(.22,.61,.36,1)';
+    line.style.strokeDashoffset = 0;
+    setTimeout(()=>{ fill.style.opacity = 1; }, 500);
+  });
+}
+
+function fillBars(){
+  document.querySelectorAll('.bfill').forEach(b=>{ b.style.width = (b.dataset.w||0)+'%'; });
+}
+
+let counted = false;
+function runMotion(){
+  // staggered reveal
+  const items = [...document.querySelectorAll('.reveal')];
+  items.forEach((el,i)=>{ el.classList.remove('in'); });
+  // force reflow then stagger in
+  void document.body.offsetWidth;
+  items.forEach((el,i)=>{ setTimeout(()=> el.classList.add('in'), reduce?0:i*70); });
+  // numbers + chart + bars (slight delay so they ride the reveal)
+  setTimeout(()=>{
+    document.querySelectorAll('[data-count]').forEach(countUp);
+    drawEquity(); fillBars();
+  }, reduce?0:250);
+}
+
+// tab pill positioning
+function setPill(btn){
+  const pill = document.getElementById('tabpill');
+  pill.style.left = btn.offsetLeft + 'px';
+  pill.style.width = btn.offsetWidth + 'px';
+}
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t=> t.addEventListener('click', ()=>{
+  document.querySelector('.tab.active')?.classList.remove('active');
+  t.classList.add('active'); setPill(t);
+  // gentle content cross-fade on tab switch
+  const wrap = document.querySelector('.wrap');
+  if(!reduce){ wrap.style.transition='none'; wrap.style.opacity='.0'; wrap.style.transform='translateY(6px)';
+    requestAnimationFrame(()=>{ wrap.style.transition='opacity .4s var(--ease,ease),transform .4s ease'; wrap.style.opacity='1'; wrap.style.transform='none'; }); }
+}));
+
+document.getElementById('replay').addEventListener('click', runMotion);
+window.addEventListener('load', ()=>{ setPill(document.querySelector('.tab.active')); runMotion(); });
+window.addEventListener('resize', ()=> setPill(document.querySelector('.tab.active')));
+</script>
+</body>
+</html>
