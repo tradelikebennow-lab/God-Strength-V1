@@ -4,6 +4,7 @@ import React from 'react';
 export const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'in-depth', label: 'In Depth' },
+  { id: 'edge-lab', label: 'Edge Lab' },
   { id: 'trade-log', label: 'Trade Log' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'accounts', label: 'Accounts' },

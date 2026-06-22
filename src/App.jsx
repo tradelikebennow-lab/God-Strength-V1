@@ -11,6 +11,7 @@ import TopBar from './components/TopBar.jsx';
 import ImportModal from './components/ImportModal.jsx';
 import Dashboard from './tabs/Dashboard.jsx';
 import InDepth from './tabs/InDepth.jsx';
+import EdgeLab from './tabs/EdgeLab.jsx';
 import TradeLog from './tabs/TradeLog.jsx';
 import Transactions from './tabs/Transactions.jsx';
 import Accounts from './tabs/Accounts.jsx';
@@ -268,6 +269,7 @@ export default function App() {
           >
             {activeTab === 'dashboard' && <Dashboard state={state} filters={filters} />}
             {activeTab === 'in-depth' && <InDepth state={state} filters={filters} />}
+            {activeTab === 'edge-lab' && <EdgeLab state={state} filters={filters} />}
             {activeTab === 'trade-log' && <TradeLog state={state} setState={setState} filters={filters} />}
             {activeTab === 'transactions' && <Transactions state={state} setState={setState} />}
             {activeTab === 'accounts' && <Accounts state={state} setState={setState} />}

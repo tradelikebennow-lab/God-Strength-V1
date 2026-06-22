@@ -6,10 +6,17 @@ import MiniTable from '../components/MiniTable.jsx';
 import { computeAccountStats, matchesStrategy } from '../analytics/account.js';
 import { byStrategy, byDirection, byTradeType, byLOIFreshness, byMarket, byInstrument, allAccountsComparison } from '../analytics/breakdowns.js';
 import { marketZoneSizes, concurrentTrades, rDistribution, dayOfWeekStats, holdTimeVsR } from '../analytics/extras.js';
+import { enrichEdgeFeatures, leakageScan, evaluateCut } from '../analytics/edge.js';
 import { fmtCur, fmtPct, fmtR, tradesToUSD } from '../utils/currency.js';
-import { dateMonth } from '../utils/dates.js';
+import { dateMonth, dateYear } from '../utils/dates.js';
 
 const MONTHS = ['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Edge Lab rigor badge: is a breakdown row signal, noise, low-n, or outcome-coupled?
+const VTONE = { pos: 'var(--success)', neg: 'var(--danger)', warn: '#e8a13a', dim: 'var(--fg-dim)' };
+const Verdict = ({ tone = 'dim', children }) => (
+  <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 999, border: '1px solid currentColor', color: VTONE[tone] || 'var(--fg-dim)', whiteSpace: 'nowrap' }}>{children}</span>
+);
 
 export default function InDepth({ state, filters }) {
   const { accounts, trades, transactions, settings } = state;
@@ -60,17 +67,41 @@ export default function InDepth({ state, filters }) {
     const dow = dayOfWeekStats(extrasTrades, { year, accountId });
     const holdScatter = holdTimeVsR(extrasTrades, { year, accountId });
 
-    return { accStats, strategyBd, directionBd, typeBd, loiBd, marketBd, instBd, compareRows, zones, concurrent, rDist, dow, holdScatter };
+    // significance + leakage verdicts for the breakdown badges (Edge Lab rigor layer)
+    const edgeBase = enrichEdgeFeatures(usdTrades.filter((t) => {
+      if (accountId && t.accountId !== accountId) return false;
+      if (year && dateYear(t.closeDate || t.filledDate) !== year) return false;
+      if (strategy && !matchesStrategy(t.timeframe, strategy)) return false;
+      if (monthFilterApplied && parseInt(String(t.closeDate || t.filledDate).slice(5, 7), 10) !== monthFilterApplied) return false;
+      return true;
+    }));
+    const VDIMS = ['direction', 'tradeType', 'loiFreshness', 'market'];
+    const vscan = leakageScan(edgeBase, VDIMS, { valueKey: 'totalR' });
+    const verdicts = {};
+    for (const dim of VDIMS) {
+      const vals = [...new Set(edgeBase.map((t) => t[dim]).filter((v) => v != null))];
+      const bonf = 0.05 / Math.max(1, vals.length);
+      const leaked = vscan[dim]?.flag === 'LEAKED';
+      const vm = {};
+      for (const v of vals) {
+        const ev = evaluateCut(edgeBase.filter((t) => t[dim] === v).map((t) => t.totalR));
+        vm[v] = leaked ? ['warn', 'leaked'] : ev.n < 30 ? ['dim', 'low n'] : (ev.expectancy > 0 && ev.p < bonf) ? ['pos', 'edge (prelim)'] : ['dim', 'noise'];
+      }
+      verdicts[dim] = vm;
+    }
+
+    return { accStats, strategyBd, directionBd, typeBd, loiBd, marketBd, instBd, compareRows, zones, concurrent, rDist, dow, holdScatter, verdicts };
   }, [accounts, trades, transactions, year, accountId, strategy, monthFilterApplied]);
 
-  const { accStats, strategyBd, directionBd, typeBd, loiBd, marketBd, instBd, compareRows, zones, concurrent, rDist, dow, holdScatter } = M;
+  const { accStats, strategyBd, directionBd, typeBd, loiBd, marketBd, instBd, compareRows, zones, concurrent, rDist, dow, holdScatter, verdicts } = M;
   // $ — native currency of the selected account (single-account stat cards).
   // $usd — breakdown tables, whose PnL is always USD-normalized above.
   const $ = (v) => fmtCur(v, account?.currency || 'USD', currencyMode, eurFx);
   const $usd = (v) => fmtCur(v, 'USD', currencyMode, eurFx);
 
   /* --- Helpers --- */
-  const renderBreakdown = (title, groups) => {
+  const renderBreakdown = (title, groups, dim) => {
+    const vmap = dim ? (verdicts?.[dim] || {}) : null;
     const rows = Object.entries(groups)
       .filter(([_, s]) => s.count > 0)
       .map(([name, s]) => ({
@@ -80,6 +111,7 @@ export default function InDepth({ state, filters }) {
         totalR: s.totalR,
         profitFactor: s.profitFactor,
         expectancy: s.expectancy,
+        _verdict: vmap ? (vmap[name] || ['dim', '—']) : null,
       }));
     if (rows.length === 0) {
       return (
@@ -100,9 +132,11 @@ export default function InDepth({ state, filters }) {
             { key: 'totalR', label: 'Total R', align: 'right', format: (v) => fmtR(v, 2, true), tone: true },
             { key: 'profitFactor', label: 'PF', align: 'right', format: (v) => isFinite(v) ? v.toFixed(2) : '∞' },
             { key: 'expectancy', label: 'Exp', align: 'right', format: (v) => fmtR(v, 2, true), tone: true },
+            ...(vmap ? [{ key: '_verdict', label: 'Verdict', format: (v) => (v ? <Verdict tone={v[0]}>{v[1]}</Verdict> : '—') }] : []),
           ]}
           rows={rows}
         />
+        {vmap && <div className="dim" style={{ fontSize: 'var(--text-xs, 11px)', marginTop: 'var(--space-sm)' }}>Preliminary, corrected within this breakdown only — the Edge Lab tab runs the stricter all-features + out-of-sample test; trust that for confirmation. Leaked = outcome-coupled. Discovery only, not advice.</div>}
       </div>
     );
   };
@@ -150,11 +184,11 @@ export default function InDepth({ state, filters }) {
       {/* ---- Breakdowns 2x2 ---- */}
       <div className="dash-two-col">
         {renderBreakdown('Strategy Breakdown', strategyBd)}
-        {renderBreakdown('Direction Breakdown', directionBd)}
+        {renderBreakdown('Direction Breakdown', directionBd, 'direction')}
       </div>
       <div className="dash-two-col">
-        {renderBreakdown('Trade Type Breakdown', typeBd)}
-        {renderBreakdown('LOI Freshness Breakdown', loiBd)}
+        {renderBreakdown('Trade Type Breakdown', typeBd, 'tradeType')}
+        {renderBreakdown('LOI Freshness Breakdown', loiBd, 'loiFreshness')}
       </div>
 
       {/* ---- Market breakdown ---- */}
