@@ -26,6 +26,7 @@ const ACCOUNT_MAP = {
   riskPct: 'risk_pct',
   tierStart: 'tier_start',
   breachFloor: 'breach_floor',
+  drawdownType: 'drawdown_type',
   status: 'status',
   payoutSplit: 'payout_split',
   fxRate: 'fx_rate',

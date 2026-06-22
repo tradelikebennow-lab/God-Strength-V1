@@ -10,7 +10,7 @@ import { computePortfolioMetrics } from '../analytics/portfolio.js';
 import { matchesStrategy } from '../analytics/account.js';
 import { computeMonthlyGrid } from '../analytics/monthly.js';
 import { byInstrument } from '../analytics/breakdowns.js';
-import { payoutProjection, projectedYearEndBalance, deriveBreachFloor, dailyLossReport, openRiskExposure } from '../analytics/extras.js';
+import { payoutProjection, projectedYearEndBalance, deriveBreachFloor, dailyLossReport, openRiskExposure, computeBreachBuffer } from '../analytics/extras.js';
 import { computeDiscipline } from '../analytics/discipline.js';
 import Creature from '../components/Creature.jsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from 'recharts';
@@ -336,23 +336,17 @@ export default function Dashboard({ state, filters }) {
           {riskRows.filter((r) => r.floor != null || r.daily.limit).map(({ acc, floor, floorUpdatedBy, daily, exposure }) => {
             const stats = port.accountStats[acc.id];
             if (!stats) return null;
-            // Buffer measured against the account's balance high-water mark,
-            // not initialBalance — trailing-drawdown accounts (e.g. scaled
-            // prop accounts) can have a breach floor ABOVE initial balance.
-            const peakBalance = Math.max(
-              acc.initialBalance,
-              ...(stats.timeline || []).map((p) => p.balance)
-            );
-            const buffer = floor != null ? Math.max(0, stats.currentBalance - floor) : null;
-            const totalBuffer = floor != null ? Math.max(0, peakBalance - floor) : null;
-            const usedPct = totalBuffer > 0 ? 1 - Math.min(1, buffer / totalBuffer) : floor != null ? 1 : 0;
+            // Per-account drawdown model (static = fixed floor, trailing = floor
+            // follows the peak). computeBreachBuffer is the single source of truth.
+            const bb = computeBreachBuffer(acc, stats.timeline, stats.currentBalance, floor, floorUpdatedBy);
             return (
               <div key={acc.id} className="breach-row">
                 <div className="breach-info">
                   <div className="breach-name">{acc.name}</div>
-                  {floor != null && (
+                  {bb && (
                     <div className="breach-detail">
-                      {fmtCur(Math.max(0, totalBuffer - buffer), acc.currency, currencyMode, eurFx, { decimals: 0 })} / {fmtCur(totalBuffer, acc.currency, currencyMode, eurFx, { decimals: 0 })} used
+                      {fmtCur(bb.usedAmount, acc.currency, currencyMode, eurFx, { decimals: 0 })} / {fmtCur(bb.maxLoss, acc.currency, currencyMode, eurFx, { decimals: 0 })} used
+                      <span className="dim"> · {bb.ddType}</span>
                       {floorUpdatedBy && (
                         <span className="dim"> · floor {fmtCur(floor, acc.currency, currencyMode, eurFx, { decimals: 0 })} (set {floorUpdatedBy.date})</span>
                       )}
@@ -380,9 +374,9 @@ export default function Dashboard({ state, filters }) {
                     </div>
                   )}
                 </div>
-                {floor != null && (
+                {bb && (
                   <div className="breach-bar-wrapper">
-                    <ProgressBar value={Math.max(0, Math.min(1, usedPct))} warnAt={0.5} dangerAt={0.75} showPct />
+                    <ProgressBar value={Math.max(0, Math.min(1, bb.usedPct))} warnAt={0.5} dangerAt={0.75} showPct />
                   </div>
                 )}
               </div>

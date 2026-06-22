@@ -1,6 +1,6 @@
 // src/tabs/Accounts.jsx
 import React, { useState } from 'react';
-import { ACCOUNT_STATUS } from '../data/schema.js';
+import { ACCOUNT_STATUS, DRAWDOWN_TYPES } from '../data/schema.js';
 import { fmtCur } from '../utils/currency.js';
 
 const EMPTY_ACCT = (i) => ({
@@ -11,6 +11,7 @@ const EMPTY_ACCT = (i) => ({
   riskPct: 0.01,
   tierStart: null,
   breachFloor: null,
+  drawdownType: 'static',
   dailyLossLimit: null,
   status: 'Locked',
   payoutSplit: 0,
@@ -68,6 +69,7 @@ export default function Accounts({ state, setState }) {
               <Field label="Payout Split" value={acc.payoutSplit ? (acc.payoutSplit * 100).toFixed(0) + '%' : '—'} />
               <Field label="Tier Start" value={acc.tierStart ? fmtCur(acc.tierStart, acc.currency, currencyMode, eurFx, { decimals: 0 }) : '—'} />
               <Field label="Breach Floor" value={acc.breachFloor ? fmtCur(acc.breachFloor, acc.currency, currencyMode, eurFx, { decimals: 0 }) : '—'} />
+              <Field label="Drawdown" value={acc.breachFloor ? (acc.drawdownType === 'trailing' ? 'Trailing' : 'Static') : '—'} />
               <Field label="Daily Loss Limit" value={acc.dailyLossLimit ? fmtCur(acc.dailyLossLimit, acc.currency, currencyMode, eurFx, { decimals: 0 }) : '—'} />
               <Field label="FX → USD" value={(acc.fxRate ?? 1).toFixed(4)} />
               <Field label="Account ID" value={acc.id} mono />
@@ -135,6 +137,12 @@ function AccountModal({ account, onSave, onCancel }) {
             <div className="form-field">
               <label className="form-label">Breach Floor (optional)</label>
               <input type="number" step="any" value={form.breachFloor || ''} onChange={(e) => setField('breachFloor', parseFloat(e.target.value) || null)} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Drawdown Type</label>
+              <select value={form.drawdownType || 'static'} onChange={(e) => setField('drawdownType', e.target.value)}>
+                {DRAWDOWN_TYPES.map((d) => <option key={d} value={d}>{d === 'trailing' ? 'Trailing' : 'Static'}</option>)}
+              </select>
             </div>
             <div className="form-field">
               <label className="form-label">Daily Loss Limit (optional)</label>

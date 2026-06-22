@@ -301,6 +301,60 @@ export function deriveBreachFloor(account, transactions) {
 }
 
 /**
+ * Breach buffer for one account — single source of truth for how close an
+ * account is to its hard floor. Handles both prop-firm drawdown models:
+ *   • static   — fixed floor (e.g. FTMO's 10% max loss). "Used" measures how far
+ *                BELOW the reference balance you've fallen; at/above the
+ *                reference, used = 0 (you can't burn buffer by sitting in profit).
+ *   • trailing — floor follows the balance high-water mark. "Used" measures the
+ *                pullback from peak against the fixed drawdown allowance.
+ *
+ * Reference balance = the balance when the floor was last set (prop scale-ups
+ * move the floor), falling back to initialBalance. maxLoss = reference − floor
+ * is the fixed dollar allowance both models share.
+ *
+ * @returns {null | {ddType, floor, effectiveFloor, refBalance, peak, maxLoss,
+ *                    remaining, usedAmount, usedPct}}  null when no floor.
+ */
+export function computeBreachBuffer(account, timeline, currentBalance, floor, floorUpdatedBy) {
+  if (floor == null || !(floor > 0)) return null;
+  const ddType = account?.drawdownType === 'trailing' ? 'trailing' : 'static';
+  const init = account?.initialBalance ?? currentBalance;
+  const tl = Array.isArray(timeline) ? timeline : [];
+
+  // Flow-neutralized high-water mark (timeline.peak already nets deposits/payouts).
+  const peak = tl.length ? Math.max(init, ...tl.map((p) => p.peak ?? p.balance)) : init;
+
+  // Reference = balance on/before the floor-set date; else initial balance.
+  let refBalance = init;
+  if (floorUpdatedBy && tl.length) {
+    let b = init;
+    for (const p of tl) {
+      if (dateSort(p.date, floorUpdatedBy.date) <= 0) b = p.balance;
+      else break;
+    }
+    refBalance = b;
+  }
+  const maxLoss = Math.max(0, refBalance - floor); // fixed dollar allowance
+
+  let effectiveFloor, remaining, usedAmount;
+  if (ddType === 'trailing') {
+    effectiveFloor = Math.max(floor, peak - maxLoss); // floor trails the peak up
+    remaining = Math.max(0, currentBalance - effectiveFloor);
+    usedAmount = Math.max(0, maxLoss - remaining);
+  } else {
+    effectiveFloor = floor; // fixed
+    remaining = Math.max(0, currentBalance - floor);
+    usedAmount = Math.max(0, Math.min(maxLoss, refBalance - currentBalance));
+  }
+  const usedPct = maxLoss > 0
+    ? Math.min(1, usedAmount / maxLoss)
+    : (currentBalance <= effectiveFloor ? 1 : 0);
+
+  return { ddType, floor, effectiveFloor, refBalance, peak, maxLoss, remaining, usedAmount, usedPct };
+}
+
+/**
  * P&L summed per close-date vs the account's daily loss limit.
  * Close-date granularity only — trades carry no intraday timestamps,
  * so an intraday breach that recovered before the close is invisible.

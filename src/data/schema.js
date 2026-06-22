@@ -11,6 +11,9 @@
  * @property {number} riskPct         - default risk per trade (e.g. 0.005 = 0.5%)
  * @property {number|null} tierStart  - upgrade tier balance (null if N/A)
  * @property {number|null} breachFloor - hard breach floor (null if N/A)
+ * @property {"static"|"trailing"} [drawdownType] - how the breach floor behaves:
+ *   "static" = fixed floor (e.g. FTMO max loss); "trailing" = floor follows the
+ *   balance high-water mark. Defaults to "static" when absent.
  * @property {"Unlocked"|"Locked"} status
  * @property {number} payoutSplit     - trader's share at payout (0.25 = trader gets 25%)
  * @property {number} fxRate          - rate to USD (1.0 for USD, ~1.1723 for EUR→USD)
@@ -86,3 +89,4 @@ export const TIMEFRAMES = ['Weekly', 'Daily', '12H', '8H', '4H', '2H', '1H', '15
 export const DIRECTIONS = ['Buy', 'Sell'];
 export const TRANSACTION_TYPES = ['Deposit', 'Payout', 'Upgrade', 'Adjustment', 'Withdrawal'];
 export const ACCOUNT_STATUS = ['Unlocked', 'Locked'];
+export const DRAWDOWN_TYPES = ['static', 'trailing'];

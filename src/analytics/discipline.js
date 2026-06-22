@@ -4,7 +4,8 @@
 // still sickens the creature; a red week with clean process doesn't.
 // All inputs are existing journal data — no new schema.
 import { dateYear } from '../utils/dates.js';
-import { deriveBreachFloor, dailyLossReport, openRiskExposure } from './extras.js';
+import { deriveBreachFloor, dailyLossReport, openRiskExposure, computeBreachBuffer } from './extras.js';
+import { buildBalanceTimeline } from './account.js';
 
 const DAY = 86400e3;
 const iso = (d) => new Date(d).toISOString().slice(0, 10);
@@ -82,13 +83,16 @@ export function computeDiscipline(accounts, trades, transactions, opts = {}) {
   {
     let worst = null; // { name, pct }
     for (const a of unlocked) {
-      const { floor } = deriveBreachFloor(a, transactions);
+      const { floor, updatedBy } = deriveBreachFloor(a, transactions);
       if (floor == null || !(floor > 0)) continue;
-      const accTrades = trades.filter((t) => t.accountId === a.id);
-      const bal = a.initialBalance
-        + accTrades.reduce((s, t) => s + (t.totalPnl || 0), 0)
-        + transactions.filter((x) => x.accountId === a.id).reduce((s, x) => s + (x.amount || 0), 0);
-      const pct = (bal - floor) / bal;
+      // Use the SAME balance timeline as the rest of the app (payouts subtracted,
+      // not added) and measure distance to the EFFECTIVE floor so trailing
+      // accounts are handled correctly.
+      const timeline = buildBalanceTimeline(a, trades, transactions);
+      const bal = timeline.length ? timeline[timeline.length - 1].balance : a.initialBalance;
+      const bb = computeBreachBuffer(a, timeline, bal, floor, updatedBy);
+      if (!bb) continue;
+      const pct = bal > 0 ? (bal - bb.effectiveFloor) / bal : 0;
       if (worst == null || pct < worst.pct) worst = { name: a.name, pct };
     }
     if (!worst) {
