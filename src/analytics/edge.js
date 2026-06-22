@@ -324,3 +324,45 @@ export function monitor(trades, { valueKey = 'totalR', segmentBy = [] } = {}) {
     cumulative, segments,
   };
 }
+
+/* ============================ Coach's read (plain-language verdicts) ============================ */
+
+/** Turn each clean pre-trade feature's buckets into KEEP / STOP / WATCH / NEUTRAL calls.
+ *  Descriptive coaching over the trader's own history (leaked features excluded). Uses an
+ *  UNCORRECTED p<0.05 only as a soft "could this be luck?" flag — the strict, multiple-
+ *  comparisons test stays in discoverThenConfirm. Returns rows sorted most-actionable first. */
+export function coachVerdicts(trades, {
+  valueKey = 'totalR',
+  dims = ['tradeType', 'direction', 'market', 'timeframe', 'dow', 'riskBucket'],
+  minN = 30, softN = 15,
+} = {}) {
+  const rows = enrichEdgeFeatures(trades);
+  const leaked = new Set(leakedDims(leakageScan(rows, dims, { valueKey })));
+  const out = [];
+  for (const dim of dims) {
+    if (leaked.has(dim)) continue;            // never coach on an outcome-coupled feature
+    for (const v of uniqVals(rows, dim)) {
+      const arr = rows.filter((t) => t[dim] === v).map((t) => t[valueKey])
+        .filter((x) => typeof x === 'number' && isFinite(x));
+      if (arr.length < softN) continue;
+      const ev = evaluateCut(arr);
+      const gw = arr.filter((x) => x > 0).reduce((s, x) => s + x, 0);
+      const gl = -arr.filter((x) => x < 0).reduce((s, x) => s + x, 0);
+      const pf = gl > 0 ? gw / gl : gw > 0 ? Infinity : 0;
+      const sig = isFinite(ev.p) && ev.p < 0.05;
+      let action, tone;
+      if (ev.n < minN) { action = 'WATCH'; tone = 'dim'; }
+      else if (ev.expectancy <= -0.10 && pf < 1.0) { action = 'STOP'; tone = 'neg'; }
+      else if (ev.expectancy >= 0.10 && pf > 1.2) { action = 'KEEP'; tone = 'pos'; }
+      else { action = 'NEUTRAL'; tone = 'dim'; }
+      out.push({
+        dim, value: v, n: ev.n, expectancy: ev.expectancy, winRate: ev.winRate,
+        profitFactor: pf, p: ev.p, sig, action, tone,
+        _prio: action === 'STOP' || action === 'KEEP' ? 2 : action === 'NEUTRAL' ? 1 : 0,
+        _score: Math.abs(ev.expectancy) * Math.sqrt(ev.n),
+      });
+    }
+  }
+  out.sort((a, b) => b._prio - a._prio || b._score - a._score);
+  return out;
+}

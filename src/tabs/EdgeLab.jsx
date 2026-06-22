@@ -10,7 +10,7 @@ import { matchesStrategy } from '../analytics/account.js';
 import { tradesToUSD, fmtR, fmtCur, fmtPct } from '../utils/currency.js';
 import { dateYear } from '../utils/dates.js';
 import {
-  enrichEdgeFeatures, monitor, leakageScan, leakedDims, discoverThenConfirm,
+  enrichEdgeFeatures, monitor, leakageScan, leakedDims, discoverThenConfirm, coachVerdicts,
 } from '../analytics/edge.js';
 
 const PREREG_DIMS = ['plannedRrBucket', 'holdBucket'];
@@ -27,6 +27,10 @@ const Pill = ({ tone = 'dim', children }) => (
   <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 999, border: '1px solid currentColor', whiteSpace: 'nowrap', color: TONE_COLOR[tone] || 'var(--fg-dim)' }}>
     {children}
   </span>
+);
+
+const Hdr = ({ title, children }) => (
+  <span title={title} style={{ borderBottom: '1px dotted var(--fg-faint)', cursor: 'help' }}>{children}</span>
 );
 
 const STATUS = {
@@ -64,12 +68,28 @@ export default function EdgeLab({ state, filters }) {
       d.excluded = dims.filter((x) => leaked.has(x));
       return d;
     };
-    return { rows, valueKey, mon, scan, prereg: run(PREREG_DIMS, 1), explore: run(EXPLORE_DIMS, 2) };
+    return { rows, valueKey, mon, scan, coach: coachVerdicts(rows, { valueKey }), prereg: run(PREREG_DIMS, 1), explore: run(EXPLORE_DIMS, 2) };
   }, [trades, accounts, year, accountId, strategy, unit]);
 
-  const { mon, scan, prereg, explore } = M;
+  const { mon, scan, coach, prereg, explore } = M;
   const money = (v) => (unit === 'R' ? fmtR(v, 2, true) : fmtCur(v, 'USD', settings.currencyMode, eurFx));
   const pVal = (p) => (p == null || Number.isNaN(p) ? '—' : p < 0.001 ? p.toExponential(1) : p.toFixed(3));
+  const mag = (v) => (unit === 'R' ? `${Math.abs(v).toFixed(2)}R` : fmtCur(Math.abs(v), 'USD', settings.currencyMode, eurFx));
+  const coachWhat = (c) => c.dim === 'direction' ? `${c.value} trades`
+    : c.dim === 'market' ? c.value
+    : c.dim === 'timeframe' ? `the ${c.value} timeframe`
+    : c.dim === 'dow' ? c.value
+    : c.dim === 'riskBucket' ? `risking ${c.value}`
+    : `${c.value} (${DIM_LABEL[c.dim] || c.dim})`;
+  const coachLine = (c) => {
+    const pf = isFinite(c.profitFactor) ? c.profitFactor.toFixed(2) : '∞';
+    const conf = c.sig ? "consistent enough that it's unlikely to be luck" : 'though at this sample it could still be luck';
+    const what = coachWhat(c);
+    if (c.action === 'STOP') return `${what}: across ${c.n} trades this lost about ${mag(c.expectancy)} per trade (profit factor ${pf}) — ${conf}. Worth cutting or reworking the setup.`;
+    if (c.action === 'KEEP') return `${what}: across ${c.n} trades this made about ${mag(c.expectancy)} per trade (profit factor ${pf}) — ${conf}.${c.sig ? ' Keep leaning into it.' : ' Keep doing it, but it is not proven yet — keep logging.'}`;
+    if (c.action === 'WATCH') return `${what}: only ${c.n} trades so far — too few to call either way. Keep collecting.`;
+    return `${what}: about breakeven across ${c.n} trades — no clear edge either way.`;
+  };
 
   if (!mon.nTrades) {
     return <div className="dashboard-grid animate-in"><div className="panel"><div className="dim" style={{ textAlign: 'center', padding: 'var(--space-xl)' }}>No closed trades in the current filter.</div></div></div>;
@@ -100,11 +120,11 @@ export default function EdgeLab({ state, filters }) {
         </div>
         <MiniTable
           columns={[
-            { key: 'cut', label: 'Cut' },
-            { key: '_status', label: 'Verdict', format: ([tone, label]) => <Pill tone={tone}>{label}</Pill> },
-            { key: 'discover', label: 'Discover (n · exp · p)', align: 'right' },
-            { key: '_need', label: 'Need ≥ (MDE)', align: 'right', format: (v) => v ? <span className={v[0] ? 'pos' : 'dim'}>{v[1]} {v[0] ? '✓' : ''}</span> : '—' },
-            { key: 'confirm', label: 'Confirm (OOS)', align: 'right' },
+            { key: 'cut', label: <Hdr title="A slice of your trades being tested — e.g. tradeType=Trend, or a pair like direction=Buy & market=Indices.">Cut</Hdr> },
+            { key: '_status', label: <Hdr title="confirmed = significant in-sample AND out-of-sample · noise = not distinguishable from luck · low n = too few trades · needs more OOS = promising but not enough held-out trades yet">Verdict</Hdr>, format: ([tone, label]) => <Pill tone={tone}>{label}</Pill> },
+            { key: 'discover', label: <Hdr title="On the in-sample (older 70%) trades — n = trades in this cut · exp = average result per trade (R or $) · p = probability the edge is luck (one-sided; must beat the Bonferroni bar)">Discover (n · exp · p)</Hdr>, align: 'right' },
+            { key: '_need', label: <Hdr title="Minimum detectable edge — the smallest expectancy that could even reach significance at this sample size. Greyed = you don't have enough trades to confirm anything here yet.">Need ≥ (MDE)</Hdr>, align: 'right', format: (v) => v ? <span className={v[0] ? 'pos' : 'dim'}>{v[1]} {v[0] ? '✓' : ''}</span> : '—' },
+            { key: 'confirm', label: <Hdr title="On the held-out newest 30% of trades — the same cut's expectancy and p-value. A real edge should survive here too.">Confirm (OOS)</Hdr>, align: 'right' },
           ]}
           rows={rows}
         />
@@ -129,6 +149,29 @@ export default function EdgeLab({ state, filters }) {
         </div>
       </div>
 
+      {/* Coach's read */}
+      <div className="panel">
+        <div className="dash-section-title">Coach&apos;s read — what to keep, what to fix</div>
+        <div className="dim" style={{ fontSize: 'var(--text-xs, 11px)', marginBottom: 'var(--space-md)' }}>
+          A plain-language take on your clean pre-trade features (outcome-coupled ones are left out). Based on your own history — descriptive, not a guarantee or a signal.
+        </div>
+        {(() => {
+          const actionable = coach.filter((c) => c.action === 'STOP' || c.action === 'KEEP');
+          const top = (actionable.length ? actionable : coach).slice(0, 6);
+          if (!top.length) return <div className="dim">Not enough trades yet to call anything keep-or-stop.</div>;
+          const PL = { STOP: ['neg', 'stop / fix'], KEEP: ['pos', 'keep'], WATCH: ['dim', 'more data'], NEUTRAL: ['dim', 'no edge'] };
+          return top.map((c, i) => (
+            <div key={`${c.dim}-${c.value}`} style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'baseline', padding: '7px 0', borderTop: i ? '1px solid var(--border)' : 'none' }}>
+              <span style={{ flex: '0 0 84px' }}><Pill tone={PL[c.action][0]}>{PL[c.action][1]}</Pill></span>
+              <span style={{ fontSize: 'var(--text-sm)', lineHeight: 1.5 }}>{coachLine(c)}</span>
+            </div>
+          ));
+        })()}
+        <div className="dim" style={{ fontSize: 'var(--text-xs, 11px)', marginTop: 'var(--space-md)' }}>
+          &ldquo;Unlikely to be luck&rdquo; is a basic check; the stricter multiple-comparisons test is in the Discovery section below.
+        </div>
+      </div>
+
       {/* Loop A — overall */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-md)' }}>
         <StatCard label={`Total (${unit})`} value={money(mon.total)} tone={mon.total >= 0 ? 'pos' : 'neg'} />
@@ -146,7 +189,7 @@ export default function EdgeLab({ state, filters }) {
             <CartesianGrid strokeOpacity={0.1} vertical={false} />
             <XAxis dataKey="i" tick={{ fontSize: 11 }} stroke="var(--fg-dim)" label={{ value: 'trade #', position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--fg-dim)' }} />
             <YAxis tick={{ fontSize: 11 }} stroke="var(--fg-dim)" width={48} />
-            <Tooltip formatter={(v) => money(v)} labelFormatter={(l) => `trade ${l}`} contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8 }} />
+            <Tooltip formatter={(v) => money(v)} labelFormatter={(l) => `trade ${l}`} contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8 }} itemStyle={{ color: 'var(--fg)' }} labelStyle={{ color: 'var(--fg-muted)' }} />
             <Area type="monotone" dataKey="v" stroke="var(--primary)" fill="url(#eq)" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
@@ -159,10 +202,10 @@ export default function EdgeLab({ state, filters }) {
           columns={[
             { key: 'feature', label: 'Feature' },
             { key: 'n', label: 'n', align: 'right' },
-            { key: 'buckets', label: 'Buckets', align: 'right' },
-            { key: 'spread', label: 'Win-rate spread', align: 'right', format: (v) => fmtPct(v, 0, false) },
-            { key: 'v', label: "Cramér's V", align: 'right', format: (v) => (isFinite(v) ? v.toFixed(2) : '—') },
-            { key: '_flag', label: 'Verdict', format: ([tone, label]) => <Pill tone={tone}>{label}</Pill> },
+            { key: 'buckets', label: <Hdr title="Distinct groups inside this feature (e.g. Trend / Counter / Sideways). Only buckets with at least 20 trades are scored.">Buckets</Hdr>, align: 'right' },
+            { key: 'spread', label: <Hdr title="Gap between the best and worst bucket's win rate. A big gap means the feature strongly separates winners from losers.">Win-rate spread</Hdr>, align: 'right', format: (v) => fmtPct(v, 0, false) },
+            { key: 'v', label: <Hdr title="Association between the feature and win/lose, from 0 (no relationship) to 1 (perfectly predicts the result).">Cramér's V</Hdr>, align: 'right', format: (v) => (isFinite(v) ? v.toFixed(2) : '—') },
+            { key: '_flag', label: <Hdr title="OK = usable pre-trade feature · REVIEW = somewhat outcome-coupled · LEAKED = nearly determines the result, auto-excluded from discovery">Verdict</Hdr>, format: ([tone, label]) => <Pill tone={tone}>{label}</Pill> },
           ]}
           rows={Object.entries(scan).map(([d, r], i) => ({
             id: i, feature: DIM_LABEL[d] || d, n: r.n, buckets: r.nBuckets,
@@ -171,11 +214,16 @@ export default function EdgeLab({ state, filters }) {
           }))}
         />
         <div className="dim" style={{ fontSize: 'var(--text-xs, 11px)', marginTop: 'var(--space-sm)' }}>
-          LEAKED = the feature nearly determines win/lose, so it can't be a pre-trade edge (e.g. a target overwritten by the exit). These are excluded from discovery below.
+          Reads each feature for outcome leakage. <b>Buckets</b> = the distinct groups within a feature (e.g. Trend / Counter / Sideways), scored only when they have ≥20 trades. <b>Win-rate spread</b> = gap between the best and worst bucket's win rate. <b>Cramér's V</b> = how strongly the feature predicts win/lose (0–1). <b>LEAKED</b> (V ≥ 0.40 or spread ≥ 45%) = the feature nearly determines the result, so it can't be a real pre-trade edge (e.g. a target field overwritten by the exit) — these are auto-excluded from the discovery tests below.
         </div>
       </div>
 
       {/* Loop B — discovery */}
+      <div className="panel" style={{ padding: 'var(--space-md) var(--space-lg)' }}>
+        <div className="dim" style={{ fontSize: 'var(--text-xs, 11px)', lineHeight: 1.6 }}>
+          <b>How to read discovery (Loop B):</b> each <b>Cut</b> is a slice of your trades. <b>Discover</b> uses the older 70% of trades to find candidates; <b>Confirm</b> holds out the newest 30% to re-test them. <b>n · exp · p</b> = number of trades · average result per trade · probability it's luck (one-sided p-value). <b>Need ≥</b> is the minimum-detectable-edge — below it you simply don't have enough trades to confirm anything. A cut is <b>confirmed</b> only if it beats the (Bonferroni-corrected) bar in-sample <i>and</i> stays significant out-of-sample. Discovery only — not a signal.
+        </div>
+      </div>
       {discoveryPanel('Pre-registered — planned R:R + hold duration', prereg)}
       {discoveryPanel('Exploratory scan — clean pre-trade features', explore)}
 
@@ -187,7 +235,7 @@ export default function EdgeLab({ state, filters }) {
             <CartesianGrid strokeOpacity={0.1} vertical={false} />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--fg-dim)" />
             <YAxis tick={{ fontSize: 11 }} stroke="var(--fg-dim)" width={48} />
-            <Tooltip formatter={(v) => money(v)} contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8 }} />
+            <Tooltip formatter={(v) => money(v)} contentStyle={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8 }} itemStyle={{ color: 'var(--fg)' }} labelStyle={{ color: 'var(--fg-muted)' }} />
             <ReferenceLine y={0} stroke="var(--fg-dim)" />
             <Bar dataKey="expectancy">
               {segData.map((d, i) => <Cell key={i} fill={d.expectancy >= 0 ? 'var(--success)' : 'var(--danger)'} />)}

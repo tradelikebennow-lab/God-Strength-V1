@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   studentTSf, tCritical, minDetectableEdge, evaluateCut, plannedRR,
-  enrichEdgeFeatures, discoverThenConfirm, leakageScan, leakedDims, monitor,
+  enrichEdgeFeatures, discoverThenConfirm, leakageScan, leakedDims, monitor, coachVerdicts,
 } from './edge.js';
 import fx from './__fixtures__/edge_parity.json';
 
@@ -112,5 +112,28 @@ describe('PARITY with the Python engine (real 213-trade journal)', () => {
       expect(close(c.discover.p, r.p, 1e-5)).toBe(true);
       expect(close(c.discover.mde, r.mde, 1e-5)).toBe(true);
     }
+  });
+});
+
+describe('coachVerdicts', () => {
+  it('calls a losing bucket STOP, a strong winner KEEP, a thin bucket WATCH, and skips leaked features', () => {
+    // mixed win/lose within each type (so tradeType itself isn't outcome-coupled),
+    // but clearly different expectancy per type.
+    const mk = (type, r) => ({ tradeType: type, totalR: r, leak: r > 0 ? 'W' : 'L' });
+    const trades = [
+      ...Array.from({ length: 18 }, () => mk('Counter', 0.5)),
+      ...Array.from({ length: 22 }, () => mk('Counter', -1.0)),   // Counter: -0.325R, PF 0.41 -> STOP
+      ...Array.from({ length: 22 }, () => mk('Trend', 1.5)),
+      ...Array.from({ length: 18 }, () => mk('Trend', -0.5)),     // Trend: +0.6R, PF 3.67 -> KEEP
+      ...Array.from({ length: 10 }, () => mk('Sideways', 0.5)),
+      ...Array.from({ length: 10 }, () => mk('Sideways', -0.5)),  // Sideways: n=20 (<30) -> WATCH
+    ];
+    const out = coachVerdicts(trades, { dims: ['tradeType', 'leak'], valueKey: 'totalR' });
+    const byVal = Object.fromEntries(out.map((c) => [c.value, c]));
+    expect(byVal.Counter.action).toBe('STOP');
+    expect(byVal.Trend.action).toBe('KEEP');
+    expect(byVal.Sideways.action).toBe('WATCH');
+    expect(out.some((c) => c.dim === 'leak')).toBe(false);   // perfectly-leaked feature excluded
+    expect(out[0]._prio).toBe(2);                            // actionable rows sort first
   });
 });
