@@ -65,6 +65,9 @@ const TRADE_MAP = {
   loiFreshness: 'loi_freshness',
   riskPct: 'risk_pct',
   remarks: 'remarks',
+  tags: 'tags',
+  plannedTarget: 'planned_target',
+  entryTime: 'entry_time',
 };
 
 const TX_MAP = {
@@ -80,6 +83,8 @@ const TX_MAP = {
 
 // date-typed columns reject '' — normalize empties to null
 const DATE_FIELDS = new Set(['filledDate', 'tp1Date', 'closeDate', 'date']);
+// time-typed columns also reject '' -> normalize to null
+const TIME_FIELDS = new Set(['entryTime']);
 
 // Postgres `numeric` columns come back from PostgREST as STRINGS (precision
 // safety). The app's analytics do arithmetic on these fields, so they must
@@ -89,7 +94,7 @@ const NUMERIC_FIELDS = new Set([
   'initialBalance', 'riskPct', 'tierStart', 'breachFloor', 'payoutSplit', 'fxRate', 'dailyLossLimit',
   // trades
   'tp1R', 'tp2R', 'totalR', 'tp1Pnl', 'tp2Pnl', 'totalPnl',
-  'entry', 'stop', 'tp1', 'exitPrice', 'streak', 'isWinner', 'nonBreakeven',
+  'entry', 'stop', 'tp1', 'exitPrice', 'streak', 'isWinner', 'nonBreakeven', 'plannedTarget',
   // transactions
   'amount', 'newHardLimit', 'profitSplit',
 ]);
@@ -99,7 +104,7 @@ function toDb(row, map) {
   for (const [appKey, dbKey] of Object.entries(map)) {
     let v = row[appKey];
     if (v === undefined) v = null;
-    if (DATE_FIELDS.has(appKey) && v === '') v = null;
+    if ((DATE_FIELDS.has(appKey) || TIME_FIELDS.has(appKey)) && v === '') v = null;
     if (v !== null && v !== '' && NUMERIC_FIELDS.has(appKey)) {
       const n = Number(v);
       if (!Number.isNaN(n)) v = n;

@@ -24,6 +24,9 @@ const EMPTY_TRADE = () => ({
   tradeType: 'Sideways',
   lol: 'No', mtfCoverage: 'No', loiFreshness: 'No',
   riskPct: 0.005,
+  plannedTarget: 0,
+  entryTime: '',
+  tags: [],
   remarks: '',
 });
 
@@ -35,7 +38,7 @@ const EMPTY_TRADE = () => ({
  *   onSave(trade): void
  *   onCancel(): void
  */
-export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
+export default function TradeForm({ open, trade, accounts, onSave, onCancel, knownTags = [] }) {
   const [form, setForm] = useState(() => trade || EMPTY_TRADE());
   const [errors, setErrors] = useState({});
   // Tracks whether the user hand-edited Total PnL this session. If they did,
@@ -173,6 +176,9 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
               <Field label="Close Date" error={errors.closeDate}>
                 <input type="date" value={form.closeDate} onChange={(e) => setField('closeDate', e.target.value)} />
               </Field>
+              <Field label="Entry Time">
+                <input type="time" value={form.entryTime || ''} onChange={(e) => setField('entryTime', e.target.value)} />
+              </Field>
             </div>
           </div>
 
@@ -187,6 +193,9 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
               </Field>
               <Field label="TP1 Price" error={errors.tp1} required>
                 <input type="number" step="any" value={form.tp1 || ''} onChange={(e) => setField('tp1', parseFloat(e.target.value) || 0)} />
+              </Field>
+              <Field label="Planned Target">
+                <input type="number" step="any" placeholder="intended TP at entry" value={form.plannedTarget || ''} onChange={(e) => setField('plannedTarget', parseFloat(e.target.value) || 0)} />
               </Field>
               <Field label="Trailing/Exit">
                 <input type="number" step="any" value={form.exitPrice || ''} onChange={(e) => setField('exitPrice', parseFloat(e.target.value) || 0)} />
@@ -234,6 +243,19 @@ export default function TradeForm({ open, trade, accounts, onSave, onCancel }) {
           )}
 
           <div className="form-section">
+            <div className="form-section-title">Notes &amp; Tags</div>
+            <Field label="Tags (comma-separated)">
+              <input
+                type="text"
+                list="known-tags"
+                placeholder="e.g. A+ setup, news, retest"
+                value={(form.tags || []).join(', ')}
+                onChange={(e) => setField('tags', e.target.value.split(',').map((t) => t.trim()).filter(Boolean))}
+              />
+              <datalist id="known-tags">
+                {(knownTags || []).map((t) => <option key={t} value={t} />)}
+              </datalist>
+            </Field>
             <Field label="Remarks">
               <textarea
                 rows={2}

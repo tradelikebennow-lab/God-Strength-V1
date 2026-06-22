@@ -173,6 +173,7 @@ export default function TradeLog({ state, setState, filters }) {
         open={editing !== null}
         trade={editing?.trade}
         accounts={accounts}
+        knownTags={[...new Set((trades || []).flatMap((t) => t.tags || []))].sort()}
         onSave={saveTrade}
         onCancel={() => setEditing(null)}
       />

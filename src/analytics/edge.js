@@ -141,15 +141,56 @@ const rrBucket = (rr) => (rr == null ? null : rr <= 1.5 ? 'RR<1.5' : rr <= 2.5 ?
 const holdBucket = (h) => (h == null ? null : h <= 0 ? '0d intraday' : h <= 3 ? '1-3d' : h <= 7 ? '4-7d' : '>7d');
 const riskBucket = (v) => (v == null || !isFinite(v) ? null : `${parseFloat((v * 100).toPrecision(3))}%`);
 
+// Session from an entry time "HH:MM" (assumes the time is in the trader's own
+// chart/broker timezone). Coarse 4-bucket split so cells keep enough sample.
+const sessionLabel = (t) => {
+  if (t == null || typeof t !== 'string') return null;
+  const m = /^(\d{1,2})/.exec(t.trim());
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  if (!(h >= 0 && h <= 23)) return null;
+  if (h < 8) return 'Asian (00-07)';
+  if (h < 13) return 'London (08-12)';
+  if (h < 21) return 'New York (13-20)';
+  return 'Off-hours (21-23)';
+};
+
 /** Attach mechanical pre-trade features used as discovery/leakage dimensions. Pure. */
 export function enrichEdgeFeatures(trades) {
   return trades.map((t) => ({
     ...t,
-    plannedRrBucket: rrBucket(plannedRR(t.entry, t.stop, t.tp1)),
+    // planned R:R from the PLANNED target captured at entry (clean, pre-trade),
+    // not from tp1/exit (which is outcome-coupled). Null when no target logged.
+    plannedRrBucket: rrBucket(
+      (t.plannedTarget && isFinite(t.plannedTarget)) ? plannedRR(t.entry, t.stop, t.plannedTarget) : null,
+    ),
     holdBucket: holdBucket(holdDays(t.filledDate, t.closeDate)),
     dow: dayOfWeek(t.filledDate),
     riskBucket: riskBucket(t.riskPct),
+    session: sessionLabel(t.entryTime),
   }));
+}
+
+/** Expand free-form trade tags into per-tag yes/no dimensions for discovery.
+ *  Only tags with at least minCount trades become a dimension (keeps the
+ *  multiple-comparisons count sane). Tags are normalised to trimmed lowercase. */
+export function expandTagDims(trades, { minCount = 10 } = {}) {
+  const counts = new Map();
+  for (const t of trades) {
+    for (const raw of (Array.isArray(t.tags) ? t.tags : [])) {
+      const tag = String(raw).trim().toLowerCase();
+      if (tag) counts.set(tag, (counts.get(tag) || 0) + 1);
+    }
+  }
+  const kept = [...counts.entries()].filter(([, c]) => c >= minCount).map(([t]) => t).sort();
+  const dims = kept.map((t) => `tag:${t}`);
+  const out = trades.map((t) => {
+    const set = new Set((Array.isArray(t.tags) ? t.tags : []).map((x) => String(x).trim().toLowerCase()));
+    const add = {};
+    for (const tag of kept) add[`tag:${tag}`] = set.has(tag) ? 'yes' : 'no';
+    return { ...t, ...add };
+  });
+  return { trades: out, dims };
 }
 
 /* ============================ candidate cuts ============================ */

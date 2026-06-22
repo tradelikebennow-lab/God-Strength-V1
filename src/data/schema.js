@@ -53,6 +53,9 @@
  * @property {"Yes"|"No"} loiFreshness
  * @property {number} riskPct         - actual risk taken on this trade
  * @property {string} remarks
+ * @property {string[]} tags          - free-form trader tags (pre-trade), e.g. ["A+ setup","news"]
+ * @property {number|null} plannedTarget - intended TP price at entry (clean planned R:R source)
+ * @property {string|null} entryTime  - entry time-of-day "HH:MM" (for session analysis)
  */
 
 /**

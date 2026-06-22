@@ -10,17 +10,18 @@ import { matchesStrategy } from '../analytics/account.js';
 import { tradesToUSD, fmtR, fmtCur, fmtPct } from '../utils/currency.js';
 import { dateYear } from '../utils/dates.js';
 import {
-  enrichEdgeFeatures, monitor, leakageScan, leakedDims, discoverThenConfirm, coachVerdicts,
+  enrichEdgeFeatures, expandTagDims, monitor, leakageScan, leakedDims, discoverThenConfirm, coachVerdicts,
 } from '../analytics/edge.js';
 
 const PREREG_DIMS = ['plannedRrBucket', 'holdBucket'];
-const EXPLORE_DIMS = ['tradeType', 'direction', 'market', 'timeframe', 'dow', 'riskBucket'];
-const SEGMENT_DIMS = ['tradeType', 'direction', 'market', 'timeframe'];
+const EXPLORE_DIMS = ['tradeType', 'direction', 'market', 'timeframe', 'dow', 'riskBucket', 'session'];
+const SEGMENT_DIMS = ['tradeType', 'direction', 'market', 'timeframe', 'session'];
 const DIM_LABEL = {
   plannedRrBucket: 'Planned R:R', holdBucket: 'Hold duration', dow: 'Day of week',
   riskBucket: 'Risk size', tradeType: 'Trade type', direction: 'Direction',
-  market: 'Market', timeframe: 'Timeframe',
+  market: 'Market', timeframe: 'Timeframe', session: 'Session',
 };
+const prettyDim = (d) => DIM_LABEL[d] || (d && d.startsWith('tag:') ? `tag "${d.slice(4)}"` : d);
 
 const TONE_COLOR = { pos: 'var(--success)', neg: 'var(--danger)', warn: '#e8a13a', dim: 'var(--fg-dim)' };
 const Pill = ({ tone = 'dim', children }) => (
@@ -56,11 +57,13 @@ export default function EdgeLab({ state, filters }) {
       if (strategy && !matchesStrategy(t.timeframe, strategy)) return false;
       return t.status !== 'Open';
     });
-    const rows = enrichEdgeFeatures(base);
+    const enriched0 = enrichEdgeFeatures(base);
+    const { trades: rows, dims: tagDims } = expandTagDims(enriched0);
     const valueKey = unit === 'R' ? 'totalR' : 'totalPnl';
+    const exploreDims = [...EXPLORE_DIMS, ...tagDims];
 
     const mon = monitor(rows, { valueKey, segmentBy: SEGMENT_DIMS });
-    const scan = leakageScan(rows, [...EXPLORE_DIMS, ...PREREG_DIMS], { valueKey });
+    const scan = leakageScan(rows, [...exploreDims, ...PREREG_DIMS], { valueKey });
     const leaked = new Set(leakedDims(scan));
     const run = (dims, maxOrder) => {
       const kept = dims.filter((d) => !leaked.has(d));
@@ -68,7 +71,7 @@ export default function EdgeLab({ state, filters }) {
       d.excluded = dims.filter((x) => leaked.has(x));
       return d;
     };
-    return { rows, valueKey, mon, scan, coach: coachVerdicts(rows, { valueKey }), prereg: run(PREREG_DIMS, 1), explore: run(EXPLORE_DIMS, 2) };
+    return { rows, valueKey, mon, scan, coach: coachVerdicts(rows, { valueKey, dims: exploreDims }), prereg: run(PREREG_DIMS, 1), explore: run(exploreDims, 2) };
   }, [trades, accounts, year, accountId, strategy, unit]);
 
   const { mon, scan, coach, prereg, explore } = M;
@@ -79,7 +82,9 @@ export default function EdgeLab({ state, filters }) {
     : c.dim === 'market' ? c.value
     : c.dim === 'timeframe' ? `the ${c.value} timeframe`
     : c.dim === 'dow' ? c.value
+    : c.dim === 'session' ? `the ${c.value} session`
     : c.dim === 'riskBucket' ? `risking ${c.value}`
+    : c.dim.startsWith('tag:') ? `trades ${c.value === 'yes' ? '' : 'not '}tagged "${c.dim.slice(4)}"`
     : `${c.value} (${DIM_LABEL[c.dim] || c.dim})`;
   const coachLine = (c) => {
     const pf = isFinite(c.profitFactor) ? c.profitFactor.toFixed(2) : '∞';
@@ -116,7 +121,7 @@ export default function EdgeLab({ state, filters }) {
         <div className="dash-section-title">{title}</div>
         <div className="dim" style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-sm)' }}>
           {disc.nConfirmed} confirmed of {disc.nTested} cuts · Bonferroni p&lt;{pVal(disc.bonferroniAlpha)} · confirm needs OOS n≥30
-          {disc.excluded?.length ? ` · excluded (leaked): ${disc.excluded.map((d) => DIM_LABEL[d] || d).join(', ')}` : ''}
+          {disc.excluded?.length ? ` · excluded (leaked): ${disc.excluded.map((d) => prettyDim(d)).join(', ')}` : ''}
         </div>
         <MiniTable
           columns={[
@@ -208,7 +213,7 @@ export default function EdgeLab({ state, filters }) {
             { key: '_flag', label: <Hdr title="OK = usable pre-trade feature · REVIEW = somewhat outcome-coupled · LEAKED = nearly determines the result, auto-excluded from discovery">Verdict</Hdr>, format: ([tone, label]) => <Pill tone={tone}>{label}</Pill> },
           ]}
           rows={Object.entries(scan).map(([d, r], i) => ({
-            id: i, feature: DIM_LABEL[d] || d, n: r.n, buckets: r.nBuckets,
+            id: i, feature: prettyDim(d), n: r.n, buckets: r.nBuckets,
             spread: r.winRateSpread, v: r.cramersV,
             _flag: r.flag === 'LEAKED' ? ['neg', 'LEAKED'] : r.flag === 'REVIEW' ? ['warn', 'REVIEW'] : r.flag === 'OK' ? ['pos', 'OK'] : ['dim', 'insufficient'],
           }))}

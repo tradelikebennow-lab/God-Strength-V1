@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   studentTSf, tCritical, minDetectableEdge, evaluateCut, plannedRR,
-  enrichEdgeFeatures, discoverThenConfirm, leakageScan, leakedDims, monitor, coachVerdicts,
+  enrichEdgeFeatures, expandTagDims, discoverThenConfirm, leakageScan, leakedDims, monitor, coachVerdicts,
 } from './edge.js';
 import fx from './__fixtures__/edge_parity.json';
 
@@ -49,7 +49,7 @@ describe('feature derivation', () => {
     expect(plannedRR(100, 100, 120)).toBe(null);     // zero risk -> null
   });
   it('buckets match the Python edges', () => {
-    const t = enrichEdgeFeatures([{ entry: 100, stop: 99, tp1: 102, filledDate: '2025-01-06', closeDate: '2025-01-06', riskPct: 0.01 }])[0];
+    const t = enrichEdgeFeatures([{ entry: 100, stop: 99, tp1: 102, plannedTarget: 102, filledDate: '2025-01-06', closeDate: '2025-01-06', riskPct: 0.01 }])[0];
     expect(t.plannedRrBucket).toBe('RR 1.5-2.5');
     expect(t.holdBucket).toBe('0d intraday');
     expect(t.dow).toBe('Monday');
@@ -75,7 +75,9 @@ describe('PARITY with the Python engine (real 213-trade journal)', () => {
 
   it('derives the same features the Python did', () => {
     enriched.forEach((t, i) => {
-      for (const f of ['plannedRrBucket', 'holdBucket', 'dow', 'riskBucket'])
+      // plannedRrBucket now derives from the planned-target field (not TP1); the
+      // fixture predates that, so it's excluded here. The rest is unchanged.
+      for (const f of ['holdBucket', 'dow', 'riskBucket'])
         expect(t[f] ?? null).toBe(fx.trades[i][f] ?? null);
     });
   });
@@ -92,6 +94,7 @@ describe('PARITY with the Python engine (real 213-trade journal)', () => {
   it('matches the leakage verdict on every feature', () => {
     const scan = leakageScan(enriched, fx.reference.leakage_dims, { valueKey: 'totalR' });
     for (const d of fx.reference.leakage_dims) {
+      if (d === 'plannedRrBucket') continue; // redefined to use planned-target; not in the fixture
       expect(scan[d].flag).toBe(fx.reference.leakage[d].flag);
       expect(close(scan[d].cramersV, fx.reference.leakage[d].cramers_v)).toBe(true);
       expect(close(scan[d].winRateSpread, fx.reference.leakage[d].win_rate_spread)).toBe(true);
@@ -135,5 +138,36 @@ describe('coachVerdicts', () => {
     expect(byVal.Sideways.action).toBe('WATCH');
     expect(out.some((c) => c.dim === 'leak')).toBe(false);   // perfectly-leaked feature excluded
     expect(out[0]._prio).toBe(2);                            // actionable rows sort first
+  });
+});
+
+
+describe('richer-entry features (planned target, session, tags)', () => {
+  it('planned R:R comes from the planned target, not the exit', () => {
+    const [a] = enrichEdgeFeatures([{ entry: 100, stop: 99, tp1: 101.2, plannedTarget: 103 }]);
+    expect(a.plannedRrBucket).toBe('RR>=2.5');      // |103-100|/|100-99| = 3.0
+    const [b] = enrichEdgeFeatures([{ entry: 100, stop: 99, tp1: 103 }]); // no plannedTarget
+    expect(b.plannedRrBucket).toBe(null);           // no target logged -> excluded, never from exit
+  });
+  it('session derives from entry time in coarse buckets', () => {
+    const out = enrichEdgeFeatures([
+      { entryTime: '02:30' }, { entryTime: '09:00' }, { entryTime: '14:45' }, { entryTime: '22:10' }, {},
+    ]);
+    expect(out.map((t) => t.session)).toEqual([
+      'Asian (00-07)', 'London (08-12)', 'New York (13-20)', 'Off-hours (21-23)', null,
+    ]);
+  });
+  it('expandTagDims makes a yes/no dim per sufficiently-common tag', () => {
+    const trades = [
+      ...Array.from({ length: 12 }, () => ({ tags: ['A+', 'news'] })),
+      ...Array.from({ length: 3 }, () => ({ tags: ['rare'] })),
+      { tags: [] }, {},
+    ];
+    const { trades: out, dims } = expandTagDims(trades, { minCount: 10 });
+    expect(dims).toContain('tag:a+');         // 12 >= 10, normalised to lowercase
+    expect(dims).toContain('tag:news');
+    expect(dims).not.toContain('tag:rare');   // only 3 occurrences
+    expect(out[0]['tag:a+']).toBe('yes');
+    expect(out[out.length - 1]['tag:a+']).toBe('no'); // trade with no tags
   });
 });
